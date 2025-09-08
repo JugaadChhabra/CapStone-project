@@ -10,7 +10,9 @@ const LoginForm: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // handle login
+    // handle login logic here (API call, validation, etc.)
+    // For now, redirect to dashboard
+    window.location.href = "/dashboard";
   };
 
   return (

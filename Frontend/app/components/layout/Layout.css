@@ -1,0 +1,12 @@
+.glass-layout {
+  display: flex;
+  min-height: 100vh;
+  background: orange;
+}
+.main-content {
+  flex: 1;
+  margin-left: 220px;
+  background: orange;
+  min-height: 100vh;
+  padding: 2rem 3rem;
+}

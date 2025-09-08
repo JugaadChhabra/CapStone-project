@@ -1,12 +1,10 @@
 import React from "react";
 
 const Logout: React.FC = () => {
-  // You can add logout logic here (e.g., clearing tokens, redirecting)
   React.useEffect(() => {
-    // Example: localStorage.removeItem('token');
-    window.location.href = "/login";
+    window.location.href = "/";
   }, []);
-  return <div>Logging out...</div>;
+  return null;
 };
 
 export default Logout;

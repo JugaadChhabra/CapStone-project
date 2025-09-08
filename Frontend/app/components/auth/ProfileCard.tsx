@@ -1,7 +1,7 @@
 import React from "react";
-import Card from "../components/ui/Card";
-import Button from "../components/ui/Button";
-import "../components/auth/ProfileCard.css";
+import Card from "../ui/Card";
+import Button from "../ui/Button";
+import "./ProfileCard.css";
 
 const ProfileCard: React.FC = () => (
   <Card className="profile-card">
@@ -12,7 +12,7 @@ const ProfileCard: React.FC = () => (
         <div className="profile-email">user@email.com</div>
       </div>
     </div>
-    <Button onClick={() => (window.location.href = "/logout")}>Logout</Button>
+  <Button onClick={() => (window.location.href = "/logout")}>Logout</Button>
   </Card>
 );
 

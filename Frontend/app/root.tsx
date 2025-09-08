@@ -1,3 +1,4 @@
+import Header from "./components/custom/Header";
 import {
   isRouteErrorResponse,
   Links,
@@ -33,7 +34,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        {children}
+        <div className="fixed inset-0 z-10">
+          <Header />
+        </div>
+        <div className="relative z-20">
+          {children}
+        </div>
         <ScrollRestoration />
         <Scripts />
       </body>

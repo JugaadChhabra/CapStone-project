@@ -32,6 +32,12 @@ const LoginForm: React.FC = () => {
           required
         />
         <Button type="submit">Sign In</Button>
+        <div style={{ textAlign: 'center', marginTop: '0.5rem' }}>
+          <span style={{ color: '#e0e0e0', fontSize: '1rem' }}>
+            Don't have an account?{' '}
+            <a href="/signup" style={{ color: '#fff', textDecoration: 'underline', opacity: 0.85 }}>Sign up</a>
+          </span>
+        </div>
       </form>
     </Card>
   );

@@ -5,13 +5,13 @@ import PerformanceReport from "../components/dashboard/PerformanceReport";
 const DashboardPage: React.FC = () => {
   // Sample data - this would come from API
   const portfolioData = [
-    { symbol: "AAPL", change: 2.45, ltp: 175.32 },
-    { symbol: "GOOGL", change: -1.23, ltp: 2834.56 },
-    { symbol: "TSLA", change: 5.67, ltp: 245.89 },
-    { symbol: "MSFT", change: 0.89, ltp: 329.45 },
-    { symbol: "AMZN", change: -2.34, ltp: 3156.78 },
-    { symbol: "NVDA", change: 3.21, ltp: 478.23 },
-    { symbol: "META", change: -0.56, ltp: 298.67 },
+    { symbol: "RELIANCE", change: 1.85, ltp: 2456.30 },
+    { symbol: "TCS", change: -0.67, ltp: 3489.75 },
+    { symbol: "INFY", change: 2.34, ltp: 1612.80 },
+    { symbol: "HDFC", change: 0.45, ltp: 1587.90 },
+    { symbol: "ICICIBANK", change: -1.23, ltp: 921.45 },
+    { symbol: "HDFCBANK", change: 1.78, ltp: 1523.60 },
+    { symbol: "BHARTIARTL", change: -0.89, ltp: 845.25 },
   ];
 
   const performanceData = [
@@ -76,9 +76,9 @@ const DashboardPage: React.FC = () => {
     }}>
       <div style={{ flex: "1", minWidth: "600px" }}>
         <PerformanceReport
-          strategyName="Supertrend Strategy report"
-          invested="$cyz"
-          current="$cyz"
+          strategyName=""
+          invested="₹8,50,000"
+          current="₹12,75,430"
           dateRange="Mar 14, 2006 — Sep 8, 2025"
           sections={performanceData}
         />
@@ -87,7 +87,7 @@ const DashboardPage: React.FC = () => {
       <div style={{ minWidth: "300px" }}>
         <PortfolioCard
           holdings={portfolioData}
-          totalValue={125430.89}
+          totalValue={1275430}
           totalChange={2.34}
         />
       </div>

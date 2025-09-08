@@ -25,7 +25,7 @@ const PortfolioCard: React.FC<PortfolioCardProps> = ({
         <h2>PORTFOLIO</h2>
         {totalValue && (
           <div className="portfolio-summary">
-            <div className="total-value">${totalValue.toLocaleString()}</div>
+            <div className="total-value">₹{totalValue.toLocaleString()}</div>
             {totalChange && (
               <div className={`total-change ${totalChange >= 0 ? 'positive' : 'negative'}`}>
                 {totalChange >= 0 ? '+' : ''}{totalChange.toFixed(2)}%

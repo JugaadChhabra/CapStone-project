@@ -16,7 +16,7 @@ class ICICISimpleWebSocket:
     def get_websocket_session_token(self):
         """Get the session token from customer details API"""
         try:
-            print("🔍 Fetching WebSocket session token...")
+            print("Fetching WebSocket session token...")
             
             url = "https://api.icicidirect.com/breezeapi/api/v1/customerdetails"
             payload = json.dumps({
@@ -32,20 +32,20 @@ class ICICISimpleWebSocket:
             
             if data.get("Success") and "session_token" in data["Success"]:
                 websocket_session_key = data["Success"]["session_token"]
-                print(f"✅ Got WebSocket session key: {websocket_session_key}")
+                print(f"Got WebSocket session key: {websocket_session_key}")
                 
                 # Decode the session key
                 decoded = base64.b64decode(websocket_session_key.encode('ascii')).decode('ascii')
                 self.user_id, self.session_token = decoded.split(":")
-                print(f"🔑 User ID: {self.user_id}")
-                print(f"🎫 Session Token: {self.session_token}")
+                print(f"User ID: {self.user_id}")
+                print(f"Session Token: {self.session_token}")
                 return True
             else:
-                print(f"❌ Failed to get session token: {data}")
+                print(f"Failed to get session token: {data}")
                 return False
                 
         except Exception as e:
-            print(f"❌ Error getting session token: {e}")
+            print(f"Error getting session token: {e}")
             return False
     
     def setup_events(self):
@@ -53,15 +53,15 @@ class ICICISimpleWebSocket:
         
         @self.sio.event
         def connect():
-            print("✅ WebSocket connected successfully!")
+            print("WebSocket connected successfully!")
         
         @self.sio.event
         def disconnect():
-            print("❌ WebSocket disconnected")
+            print("WebSocket disconnected")
         
         @self.sio.event
         def connect_error(data):
-            print(f"❌ Connection error: {data}")
+            print(f"Connection error: {data}")
         
         @self.sio.on('stock')
         def on_stock_data(data):
@@ -109,10 +109,10 @@ class ICICISimpleWebSocket:
         """Connect to WebSocket and start streaming"""
         try:
             if not self.get_websocket_session_token():
-                print("❌ Failed to get session token")
+                print("Failed to get session token")
                 return False
             
-            print("🔌 Connecting to WebSocket...")
+            print("Connecting to WebSocket...")
             auth = {"user": self.user_id, "token": self.session_token}
             
             self.sio.connect(
@@ -124,11 +124,11 @@ class ICICISimpleWebSocket:
             )
             
             if not self.sio.connected:
-                print("❌ Failed to connect to WebSocket")
+                print("Failed to connect to WebSocket")
                 return False
             
             for stock_code in stock_codes:
-                print(f"📊 Subscribing to {stock_code}")
+                print(f"Subscribing to {stock_code}")
                 self.sio.emit('join', stock_code)
             
             print(f"🚀 Streaming for {duration} seconds...")
@@ -137,23 +137,23 @@ class ICICISimpleWebSocket:
             return True
             
         except KeyboardInterrupt:
-            print("\n⏹️ Stopping stream...")
+            print("\nStopping stream...")
         except Exception as e:
-            print(f"❌ Connection error: {e}")
+            print(f"Connection error: {e}")
         finally:
             try:
                 for stock_code in stock_codes:
                     self.sio.emit("leave", stock_code)
                 self.sio.emit("disconnect", "transport close")
                 self.sio.disconnect()
-                print("✅ Disconnected successfully")
+                print("Disconnected successfully")
             except:
                 pass
 
 # Usage
 if __name__ == "__main__":
-    API_SESSION_TOKEN = ""
-    APP_KEY = ""
+    API_SESSION_TOKEN = "52907535"
+    APP_KEY = "149@B45l068J6f8L312K416353n~7758"
     
     client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
     

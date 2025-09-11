@@ -1,6 +1,6 @@
 import React from "react";
 import PortfolioCard from "../components/dashboard/PortfolioCard";
-import PerformanceReport from "../components/dashboard/PerformanceReport";
+import StrategyOverview from "../components/dashboard/StrategyOverview";
 
 const DashboardPage: React.FC = () => {
   // Sample data - this would come from API
@@ -75,12 +75,12 @@ const DashboardPage: React.FC = () => {
       alignItems: "flex-start"
     }}>
       <div style={{ flex: "1", minWidth: "600px" }}>
-        <PerformanceReport
-          strategyName=""
+        <StrategyOverview
+          strategyName="Supertrend Strategy Report"
           invested="₹8,50,000"
           current="₹12,75,430"
           dateRange="Mar 14, 2006 — Sep 8, 2025"
-          sections={performanceData}
+          performanceData={performanceData}
         />
       </div>
       

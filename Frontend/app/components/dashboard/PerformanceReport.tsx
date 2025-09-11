@@ -1,5 +1,4 @@
 import React from "react";
-import Card from "../ui/Card";
 import "./PerformanceReport.css";
 
 interface PerformanceMetric {
@@ -14,26 +13,16 @@ interface PerformanceSection {
   data: {
     all?: PerformanceMetric;
     long?: PerformanceMetric;
-    short?: PerformanceMetric;
+    short?: PerformanceMetric;  
   };
 }
 
 interface PerformanceReportProps {
-  strategyName: string;
-  invested: string;
-  current: string;
-  dateRange: string;
   sections: PerformanceSection[];
-  selectedTabs?: string[];
 }
 
 const PerformanceReport: React.FC<PerformanceReportProps> = ({
-  strategyName,
-  invested,
-  current,
-  dateRange,
-  sections,
-  selectedTabs = ["Overview", "Performance", "Trades analysis"]
+  sections
 }) => {
   const formatValue = (value: string | number) => {
     if (typeof value === 'number') {
@@ -42,78 +31,62 @@ const PerformanceReport: React.FC<PerformanceReportProps> = ({
     return value;
   };
 
-  const formatPercentage = (percentage?: number, isPositive?: boolean) => {
-    if (percentage === undefined) return '';
-    const sign = percentage >= 0 ? '+' : '';
-    const className = isPositive !== undefined ? 
-      (isPositive ? 'positive' : 'negative') : 
-      (percentage >= 0 ? 'positive' : 'negative');
-    return <span className={className}>{sign}{percentage.toFixed(2)}%</span>;
-  };
-
   return (
-    <Card className="performance-report">
-      <div className="performance-header">
-        <div className="strategy-info">
-          <h3>{strategyName}</h3>
-          <div className="investment-summary">
-            <div className="investment-line">Invested - {invested}</div>
-            <div className="investment-line">Current - {current}</div>
-          </div>
-        </div>
-        <div className="date-range">{dateRange}</div>
+    <div className="performance-table">
+      <div className="performance-table-header">
+        <span>METRIC</span>
+        <span>ALL</span>
+        <span>LONG</span>
+        <span>SHORT</span>
       </div>
-
-      <div className="performance-tabs">
-        {selectedTabs.map((tab, index) => (
-          <button key={index} className={`tab ${index === 1 ? 'active' : ''}`}>
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="performance-metrics">
-        <div className="metrics-header">
-          <span className="metric-label">Metric</span>
-          <span className="metric-all">All</span>
-          <span className="metric-long">Long</span>
-          <span className="metric-short">Short</span>
-        </div>
-
+      
+      <div className="performance-holdings">
         {sections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="metric-row">
-            <span className="metric-label">{section.title}</span>
+          <div key={sectionIndex} className="performance-row">
+            <span className="metric-name">{section.title}</span>
             
-            <div className="metric-value">
+            <span className="metric-all">
               {section.data.all && (
                 <>
-                  {formatValue(section.data.all.value)}
-                  {formatPercentage(section.data.all.percentage, section.data.all.isPositive)}
+                  <div className="value">{formatValue(section.data.all.value)}</div>
+                  {section.data.all.percentage !== undefined && (
+                    <div className={`change ${section.data.all.isPositive !== undefined ? (section.data.all.isPositive ? 'positive' : 'negative') : (section.data.all.percentage >= 0 ? 'positive' : 'negative')}`}>
+                      {section.data.all.percentage >= 0 ? '+' : ''}{section.data.all.percentage.toFixed(2)}%
+                    </div>
+                  )}
                 </>
               )}
-            </div>
+            </span>
             
-            <div className="metric-value">
+            <span className="metric-long">
               {section.data.long && (
                 <>
-                  {formatValue(section.data.long.value)}
-                  {formatPercentage(section.data.long.percentage, section.data.long.isPositive)}
+                  <div className="value">{formatValue(section.data.long.value)}</div>
+                  {section.data.long.percentage !== undefined && (
+                    <div className={`change ${section.data.long.isPositive !== undefined ? (section.data.long.isPositive ? 'positive' : 'negative') : (section.data.long.percentage >= 0 ? 'positive' : 'negative')}`}>
+                      {section.data.long.percentage >= 0 ? '+' : ''}{section.data.long.percentage.toFixed(2)}%
+                    </div>
+                  )}
                 </>
               )}
-            </div>
+            </span>
             
-            <div className="metric-value">
+            <span className="metric-short">
               {section.data.short && (
                 <>
-                  {formatValue(section.data.short.value)}
-                  {formatPercentage(section.data.short.percentage, section.data.short.isPositive)}
+                  <div className="value">{formatValue(section.data.short.value)}</div>
+                  {section.data.short.percentage !== undefined && (
+                    <div className={`change ${section.data.short.isPositive !== undefined ? (section.data.short.isPositive ? 'positive' : 'negative') : (section.data.short.percentage >= 0 ? 'positive' : 'negative')}`}>
+                      {section.data.short.percentage >= 0 ? '+' : ''}{section.data.short.percentage.toFixed(2)}%
+                    </div>
+                  )}
                 </>
               )}
-            </div>
+            </span>
           </div>
         ))}
       </div>
-    </Card>
+    </div>
   );
 };
 

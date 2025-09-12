@@ -68,7 +68,8 @@
 }
 
 .strategy-content {
-  min-height: 200px;
+  height: 400px;
+  overflow-y: auto;
 }
 
 .overview-placeholder,
@@ -79,6 +80,10 @@
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
   border: 1px dashed rgba(255,255,255,0.1);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .overview-placeholder p,

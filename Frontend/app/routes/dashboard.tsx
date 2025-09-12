@@ -1,6 +1,7 @@
 import React from "react";
 import PortfolioCard from "../components/dashboard/PortfolioCard";
 import StrategyOverview from "../components/dashboard/StrategyOverview";
+import FloatingNavbar from "../components/layout/FloatingNavbar";
 
 const DashboardPage: React.FC = () => {
   // Sample data - this would come from API
@@ -66,32 +67,36 @@ const DashboardPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ 
-      minHeight: "100vh", 
-      padding: "2rem", 
-      display: "flex", 
-      gap: "2rem",
-      flexWrap: "wrap",
-      alignItems: "flex-start"
-    }}>
-      <div style={{ flex: "1", minWidth: "600px" }}>
-        <StrategyOverview
-          strategyName="Supertrend Strategy Report"
-          invested="₹8,50,000"
-          current="₹12,75,430"
-          dateRange="Mar 14, 2006 — Sep 8, 2025"
-          performanceData={performanceData}
-        />
+    <>
+      <FloatingNavbar activeTab="Dashboard" />
+      <div style={{ 
+        minHeight: "100vh", 
+        padding: "2rem", 
+        display: "flex", 
+        gap: "2rem",
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+        paddingTop: "6rem" // Add space for floating navbar
+      }}>
+        <div style={{ flex: "1", minWidth: "600px" }}>
+          <StrategyOverview
+            strategyName="Supertrend Strategy Report"
+            invested="₹8,50,000"
+            current="₹12,75,430"
+            dateRange="Mar 14, 2006 — Sep 8, 2025"
+            performanceData={performanceData}
+          />
+        </div>
+        
+        <div style={{ minWidth: "300px" }}>
+          <PortfolioCard
+            holdings={portfolioData}
+            totalValue={1275430}
+            totalChange={2.34}
+          />
+        </div>
       </div>
-      
-      <div style={{ minWidth: "300px" }}>
-        <PortfolioCard
-          holdings={portfolioData}
-          totalValue={1275430}
-          totalChange={2.34}
-        />
-      </div>
-    </div>
+    </>
   );
 };
 

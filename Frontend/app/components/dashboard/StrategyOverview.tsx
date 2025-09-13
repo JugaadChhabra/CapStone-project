@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Card from "../ui/Card";
 import PerformanceReport from "./PerformanceReport";
+import OverviewSection from "./OverviewSection";
 import "./StrategyOverview.css";
 
 interface PerformanceMetric {
@@ -39,11 +40,7 @@ const StrategyOverview: React.FC<StrategyOverviewProps> = ({
   const renderTabContent = () => {
     switch (activeTab) {
       case "Overview":
-        return (
-          <div className="overview-placeholder">
-            <p>Overview content will be implemented here</p>
-          </div>
-        );
+        return <OverviewSection />;
       case "Performance":
         return (
           <PerformanceReport

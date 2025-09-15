@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Card from "../ui/Card";
 import PerformanceReport from "./PerformanceReport";
 import OverviewSection from "./OverviewSection";
+import TradesAnalysis from "./TradesAnalysis";
 import "./StrategyOverview.css";
 
 interface PerformanceMetric {
@@ -48,11 +49,7 @@ const StrategyOverview: React.FC<StrategyOverviewProps> = ({
           />
         );
       case "Trades analysis":
-        return (
-          <div className="trades-placeholder">
-            <p>Trades analysis content will be implemented here</p>
-          </div>
-        );
+        return <TradesAnalysis />;
       default:
         return null;
     }

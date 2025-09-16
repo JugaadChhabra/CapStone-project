@@ -3,6 +3,8 @@ import socketio
 import requests
 import json
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
 class ICICISimpleWebSocket:
     def __init__(self, api_session_token, app_key):
@@ -152,10 +154,11 @@ class ICICISimpleWebSocket:
 
 # Usage
 if __name__ == "__main__":
-    API_SESSION_TOKEN = "52907535"
-    APP_KEY = "149@B45l068J6f8L312K416353n~7758"
-    
+    load_dotenv()
+    API_SESSION_TOKEN = os.getenv("API_SESSION_TOKEN")
+    APP_KEY = os.getenv("APP_KEY")
+
     client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
     
-    stock_codes = ["4.1!2885"]
+    stock_codes = ["4.1!500294"]
     client.connect_and_stream(stock_codes, duration=60)

@@ -8,6 +8,7 @@
 .history
 
 venv/
+.env
 
 # Flutter repo-specific
 /bin/cache/

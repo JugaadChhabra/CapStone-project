@@ -160,5 +160,5 @@ if __name__ == "__main__":
 
     client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
     
-    stock_codes = ["4.1!500294"]
+    stock_codes = ["4.1!2885"]
     client.connect_and_stream(stock_codes, duration=60)

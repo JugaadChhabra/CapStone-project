@@ -70,7 +70,7 @@ class ICICISimpleWebSocket:
             """Handle incoming stock data"""
             try:
                 parsed_data = self.parse_data(data)
-                print("📊 Live Data:")
+                print("Live Data:")
                 print(f"   Symbol: {parsed_data.get('symbol', 'N/A')}")
                 print(f"   Last Price: {parsed_data.get('last', 'N/A')}")
                 print(f"   Change: {parsed_data.get('change', 'N/A')}")
@@ -133,7 +133,7 @@ class ICICISimpleWebSocket:
                 print(f"Subscribing to {stock_code}")
                 self.sio.emit('join', stock_code)
             
-            print(f"🚀 Streaming for {duration} seconds...")
+            print(f"Streaming for {duration} seconds...")
             self.sio.sleep(duration)
             
             return True
@@ -155,10 +155,11 @@ class ICICISimpleWebSocket:
 # Usage
 if __name__ == "__main__":
     load_dotenv()
+    # API_SESSION_TOKEN = input("Enter session token: ")
     API_SESSION_TOKEN = os.getenv("API_SESSION_TOKEN")
     APP_KEY = os.getenv("APP_KEY")
 
     client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
     
-    stock_codes = ["4.1!2885"]
+    stock_codes = ["4.1!2319"]
     client.connect_and_stream(stock_codes, duration=60)

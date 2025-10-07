@@ -26,7 +26,7 @@ class ICICISimpleWebSocket:
             "NCC": "4.1!2319",              # NCC Limited
             "VOLTAS": "4.1!3718",           # Voltas Ltd
             "PTC": "4.1!11355",             # PTC India Limited
-            "IOC": "4.1!1624",              # Indian Oil Corporation
+            "NIFTY": "NIFTY",               # NIFTY50 index
             "IDEA": "4.1!14366",            # Vodafone Idea Limited
             "AARTIIND": "4.1!7"             # Aarti Industries Ltd
         }
@@ -224,7 +224,7 @@ class ICICISimpleWebSocket:
         """Get selected stock codes"""
         if stock_list is None:
             # Default stocks to track
-            stock_list = ["NCC", "VOLTAS", "PTC", "IOC"]
+            stock_list = ["NCC", "VOLTAS", "PTC", "NIFTY"]
         
         return [self.stock_codes[stock] for stock in stock_list if stock in self.stock_codes]
     
@@ -258,7 +258,7 @@ if __name__ == "__main__":
         print(f"   {name}: {code}")
     
     # Get selected stocks to stream
-    stock_codes = client.get_selected_stocks(["NCC", "VOLTAS", "PTC", "IOC", "IDEA", "AARTIIND"])
+    stock_codes = client.get_selected_stocks(["NCC", "VOLTAS", "PTC", "", "IDEA", "AARTIIND"])
     
     print(f"\n� Starting live stream for {len(stock_codes)} stocks...")
     print(f"⏱️  Throttling: Max 1 log per {client.log_interval} seconds per stock")

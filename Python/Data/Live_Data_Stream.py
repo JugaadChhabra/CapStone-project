@@ -258,7 +258,7 @@ if __name__ == "__main__":
         print(f"   {name}: {code}")
     
     # Get selected stocks to stream
-    stock_codes = client.get_selected_stocks(["NCC", "VOLTAS", "PTC", "", "IDEA", "AARTIIND"])
+    stock_codes = client.get_selected_stocks(["NCC", "VOLTAS", "PTC", "IDEA", "AARTIIND"])
     
     print(f"\n� Starting live stream for {len(stock_codes)} stocks...")
     print(f"⏱️  Throttling: Max 1 log per {client.log_interval} seconds per stock")

@@ -5,36 +5,89 @@ import json
 from datetime import datetime
 from dotenv import load_dotenv
 import os
-from time import time
+from time import time, sleep
+import pandas as pd
+import threading
+from typing import Dict, List, Optional
 
-class ICICISimpleWebSocket:
-    def __init__(self, api_session_token, app_key):
+class ICICIStockPriceClient:
+    def __init__(self, api_session_token=None, app_key=None):
+        # Load credentials from environment if not provided
+        if not api_session_token or not app_key:
+            load_dotenv()
+            api_session_token = os.getenv("API_SESSION_TOKEN")
+            app_key = os.getenv("APP_KEY")
+        
+        if not api_session_token or not app_key:
+            raise ValueError("API credentials not found. Set API_SESSION_TOKEN and APP_KEY in .env file or pass them as parameters.")
+        
         self.api_session_token = api_session_token
         self.app_key = app_key
         self.session_token = None
         self.user_id = None
         self.sio = socketio.Client()
         
-        # Time-based throttling for logging
-        self.last_log_time = {}  # Track last log time per symbol
-        self.log_interval = 3    # Log every 3 seconds maximum per symbol
-        self.total_updates = 0   # Track total updates received
-        self.logged_updates = 0  # Track how many we actually logged
-        
-        # Major Indian Stock Symbols (NSE)
-        self.stock_codes = {
-            "NCC": "4.1!2319",              # NCC Limited
-            "VOLTAS": "4.1!3718",           # Voltas Ltd
-            "PTC": "4.1!11355",             # PTC India Limited
-            "NIFTY": "NIFTY",               # NIFTY50 index
-            "IDEA": "4.1!14366",            # Vodafone Idea Limited
-            "AARTIIND": "4.1!7"             # Aarti Industries Ltd
-        }
-        
-        # Reverse mapping for display
+        # Data storage
+        self.current_prices = {}  # Store latest prices
+        self.stock_codes = self.load_stock_codes_from_csv()
         self.code_to_stock = {v: k for k, v in self.stock_codes.items()}
+        self.is_connected = False
+        self.connection_lock = threading.Lock()
         
         self.setup_events()
+    
+    def load_stock_codes_from_csv(self, csv_file_path="stock_names_symbol.csv"):
+        """
+        Load stock codes from CSV file and convert to WebSocket format
+        
+        Args:
+            csv_file_path: Path to the CSV file containing stock data
+        
+        Returns:
+            Dictionary mapping stock names to WebSocket codes
+        """
+        try:
+            # Read the CSV file (assuming 3 columns: name, symbol, token)
+            df = pd.read_csv(csv_file_path, header=None, names=['company_name', 'symbol', 'token'])
+            
+            stock_codes = {}
+            special_cases = 0
+            
+            for _, row in df.iterrows():
+                company_name = str(row['company_name']).strip()
+                symbol = str(row['symbol']).strip()
+                token = str(row['token']).strip()
+                
+                # Skip rows with missing data
+                if not company_name or not symbol or not token or token == 'nan':
+                    continue
+                
+                # Create a clean stock name for mapping
+                # Extract key words from company name for shorter display
+                name_parts = company_name.replace(' Limited', '').replace(' Ltd', '').replace(' LIMITED', '').split()
+                stock_name = ' '.join(name_parts[:2] if len(name_parts) > 3 else name_parts)
+                
+                # Handle special cases like NIFTY (indices don't follow 4.1! format)
+                if symbol.upper() in ['NIFTY', 'SENSEX', 'BANKNIFTY']:
+                    websocket_code = symbol.upper()
+                    special_cases += 1
+                else:
+                    # Standard format: 4.1!{token} for NSE equity
+                    websocket_code = f"4.1!{token}"
+                
+                stock_codes[stock_name] = websocket_code
+            
+            print(f"   📈 Converted {len(stock_codes)} stocks to WebSocket format")
+            if special_cases > 0:
+                print(f"   🔍 Found {special_cases} special cases (indices)")
+            
+            return stock_codes
+            
+        except (FileNotFoundError, Exception) as e:
+            error_msg = f"CSV file not found: {csv_file_path}" if isinstance(e, FileNotFoundError) else f"Error loading CSV: {e}"
+            print(f"❌ {error_msg}")
+            print("   Using fallback stock codes...")
+            return {"NIFTY": "NIFTY", "NCC": "4.1!2319", "VOLTAS": "4.1!3718"}
     
     def get_websocket_session_token(self):
         """Get the session token from customer details API"""
@@ -88,99 +141,67 @@ class ICICISimpleWebSocket:
         
         @self.sio.on('stock')
         def on_stock_data(data):
-            """Handle incoming index data with time-based throttling"""
+            """Handle incoming stock data and store latest prices"""
             try:
-                self.total_updates += 1
                 parsed_data = self.parse_data(data)
                 symbol = parsed_data.get('symbol', 'Unknown')
-                stock_name = self.get_stock_name(symbol)
                 
-                current_time = time()
-                last_time = self.last_log_time.get(symbol, 0)
-                
-                # Check if enough time has passed since last log for this symbol
-                if current_time - last_time >= self.log_interval:
-                    self.last_log_time[symbol] = current_time
-                    self.logged_updates += 1
-                    
-                    # Calculate percentage change
-                    last_price = float(parsed_data.get('last', 0))
-                    change = float(parsed_data.get('change', 0))
-                    
-                    if last_price > 0:
-                        percentage_change = (change / (last_price - change)) * 100
-                    else:
-                        percentage_change = 0
-                    
-                    # Determine color indicator
-                    trend = "📈" if change >= 0 else "📉"
-                    change_str = f"+{change:.2f}" if change >= 0 else f"{change:.2f}"
-                    perc_str = f"+{percentage_change:.2f}%" if percentage_change >= 0 else f"{percentage_change:.2f}%"
-                    
-                    print(f"\n{trend} {stock_name}")
-                    print(f"   Price: ₹{last_price:,.2f}")
-                    print(f"   Change: {change_str} ({perc_str})")
-                    print(f"   High: ₹{parsed_data.get('high', 'N/A')}")
-                    print(f"   Low: ₹{parsed_data.get('low', 'N/A')}")
-                    print(f"   Volume: {parsed_data.get('ltq', 'N/A')}")
-                    print(f"   Timestamp: {datetime.now().strftime('%H:%M:%S')}")
-                    print(f"   Updates: {self.logged_updates}/{self.total_updates} logged")
-                    print("=" * 50)
-                else:
-                    # Show brief update for throttled messages
-                    time_left = self.log_interval - (current_time - last_time)
-                    print(f"⏱️  {stock_name}: ₹{parsed_data.get('last', 'N/A')} (throttled, {time_left:.1f}s left)")
+                # Store the latest price data
+                if symbol and 'last' in parsed_data:
+                    with self.connection_lock:
+                        self.current_prices[symbol] = {
+                            'price': float(parsed_data.get('last', 0)),
+                            'change': float(parsed_data.get('change', 0)),
+                            'high': float(parsed_data.get('high', 0)),
+                            'low': float(parsed_data.get('low', 0)),
+                            'open': float(parsed_data.get('open', 0)),
+                            'volume': parsed_data.get('ltq', 0),
+                            'timestamp': datetime.now(),
+                            'symbol': symbol
+                        }
                 
             except Exception as e:
-                print(f"Error parsing data: {e}")
-                print(f"Raw data: {data}")
+                print(f"Error processing stock data: {e}")
     
     def get_stock_name(self, symbol_or_code):
         """Get readable stock name from symbol or code"""
-        # Check if it's in our reverse mapping
-        for code, name in self.code_to_stock.items():
-            if code in [symbol_or_code] or symbol_or_code in code:
-                return name
-        return symbol_or_code
+        return self.code_to_stock.get(symbol_or_code, symbol_or_code)
     
     def parse_data(self, data):
         """Enhanced data parser for indices"""
-        if not data or not isinstance(data, list) or len(data) == 0:
-            return {}
+        if not data or not isinstance(data, list) or len(data) < 12:
+            return {"raw_data": data} if data else {}
         
         try:
-            if len(data) >= 12:
-                return {
-                    "symbol": data[0],
-                    "open": data[1],
-                    "last": data[2],
-                    "high": data[3],
-                    "low": data[4],
-                    "change": data[5],
-                    "bPrice": data[6],
-                    "bQty": data[7],
-                    "sPrice": data[8],
-                    "sQty": data[9],
-                    "ltq": data[10],
-                    "avgPrice": data[11],
-                    "timestamp": datetime.now().isoformat()
-                }
-            else:
-                return {"raw_data": data}
+            return {
+                "symbol": data[0],
+                "open": data[1],
+                "last": data[2],
+                "high": data[3],
+                "low": data[4],
+                "change": data[5],
+                "bPrice": data[6],
+                "bQty": data[7],
+                "sPrice": data[8],
+                "sQty": data[9],
+                "ltq": data[10],
+                "avgPrice": data[11],
+                "timestamp": datetime.now().isoformat()
+            }
         except Exception as e:
             print(f"Parse error: {e}")
             return {"raw_data": data}
     
-    def connect_and_stream(self, stock_codes, duration=30):
-        """Connect to WebSocket and start streaming"""
+    def _connect_websocket(self):
+        """Internal method to establish WebSocket connection"""
+        if self.is_connected:
+            return True
+            
         try:
             if not self.get_websocket_session_token():
-                print("Failed to get session token")
                 return False
             
-            print("Connecting to WebSocket...")
             auth = {"user": self.user_id, "token": self.session_token}
-            
             self.sio.connect(
                 "https://livestream.icicidirect.com", 
                 headers={"User-Agent": "python-socketio[client]/socket"}, 
@@ -189,57 +210,185 @@ class ICICISimpleWebSocket:
                 wait_timeout=10
             )
             
-            if not self.sio.connected:
-                print("Failed to connect to WebSocket")
-                return False
+            self.is_connected = self.sio.connected
+            return self.is_connected
             
-            for stock_code in stock_codes:
-                print(f"Subscribing to {stock_code}")
-                self.sio.emit('join', stock_code)
-            
-            print(f"Streaming for {duration} seconds...")
-            self.sio.sleep(duration)
-            
-            return True
-            
-        except KeyboardInterrupt:
-            print("\nStopping stream...")
         except Exception as e:
-            print(f"Connection error: {e}")
-        finally:
-            try:
-                for stock_code in stock_codes:
-                    self.sio.emit("leave", stock_code)
-                self.sio.emit("disconnect", "transport close")
-                self.sio.disconnect()
-                print("Disconnected successfully")
-            except:
-                pass
+            print(f"WebSocket connection error: {e}")
+            return False
     
-    def get_all_stocks(self):
-        """Get list of all stock codes"""
-        return list(self.stock_codes.values())
-    
-    def get_selected_stocks(self, stock_list=None):
-        """Get selected stock codes"""
-        if stock_list is None:
-            # Default stocks to track
-            stock_list = ["NCC", "VOLTAS", "PTC", "NIFTY"]
+    def _subscribe_to_stocks(self, stock_symbols: List[str]):
+        """Subscribe to stock updates"""
+        stock_codes = []
+        for symbol in stock_symbols:
+            if symbol in self.stock_codes:
+                stock_codes.append(self.stock_codes[symbol])
+            else:
+                # Try to find partial match
+                for name, code in self.stock_codes.items():
+                    if symbol.upper() in name.upper():
+                        stock_codes.append(code)
+                        break
         
-        return [self.stock_codes[stock] for stock in stock_list if stock in self.stock_codes]
+        for stock_code in stock_codes:
+            self.sio.emit('join', stock_code)
+        
+        return stock_codes
     
-    def get_throttling_stats(self):
-        """Get throttling statistics"""
-        if self.total_updates > 0:
-            efficiency = (self.logged_updates / self.total_updates) * 100
-            return {
-                "total_updates": self.total_updates,
-                "logged_updates": self.logged_updates,
-                "throttled_updates": self.total_updates - self.logged_updates,
-                "efficiency_percent": efficiency,
-                "log_interval_seconds": self.log_interval
+    def get_current_prices(self, stock_symbols: List[str], wait_time: float = 5.0) -> Dict[str, Dict]:
+        """
+        Get current prices for specified stocks
+        
+        Args:
+            stock_symbols: List of stock names to get prices for
+            wait_time: Time to wait for data collection (seconds)
+        
+        Returns:
+            Dictionary with stock names as keys and price data as values
+        """
+        try:
+            # Connect if not already connected
+            if not self._connect_websocket():
+                raise Exception("Failed to connect to WebSocket")
+            
+            # Subscribe to requested stocks
+            subscribed_codes = self._subscribe_to_stocks(stock_symbols)
+            
+            if not subscribed_codes:
+                return {}
+            
+            # Wait for data to arrive
+            sleep(wait_time)
+            
+            # Collect results
+            results = {}
+            with self.connection_lock:
+                for symbol in stock_symbols:
+                    # Find matching data
+                    for stored_symbol, price_data in self.current_prices.items():
+                        stock_name = self.get_stock_name(stored_symbol)
+                        if (symbol.upper() == stock_name.upper() or 
+                            symbol.upper() in stock_name.upper()):
+                            results[symbol] = price_data.copy()
+                            break
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error getting prices: {e}")
+            return {}
+    
+    def disconnect(self):
+        """Disconnect from WebSocket"""
+        try:
+            if self.sio.connected:
+                self.sio.disconnect()
+            self.is_connected = False
+        except:
+            pass
+    
+    def get_selected_stocks(self, stock_list=None, max_stocks=200):
+        """
+        Get selected stock codes
+        
+        Args:
+            stock_list: List of stock names to include (None for all)
+            max_stocks: Maximum number of stocks to return (to avoid overwhelming)
+        
+        Returns:
+            List of WebSocket codes for selected stocks
+        """
+        if stock_list is None:
+            # Get all stocks but limit to avoid overwhelming the WebSocket
+            all_codes = list(self.stock_codes.values())
+            selected_codes = all_codes[:max_stocks]
+            print(f"📊 Selected first {len(selected_codes)} stocks out of {len(all_codes)} available")
+            return selected_codes
+        
+        # Get specific stocks from the list
+        selected_codes = []
+        for stock_name in stock_list:
+            if stock_name in self.stock_codes:
+                selected_codes.append(self.stock_codes[stock_name])
+            else:
+                # Try partial match
+                for name, code in self.stock_codes.items():
+                    if stock_name.upper() in name.upper():
+                        selected_codes.append(code)
+                        break
+        
+        print(f"📊 Selected {len(selected_codes)} specific stocks")
+        return selected_codes
+    
+    def get_available_stocks(self) -> List[str]:
+        """Get list of all available stock names"""
+        return list(self.stock_codes.keys())
+
+
+# Global client instance
+_client = None
+
+def get_stock_prices(stock_names: List[str], wait_time: float = 5.0) -> Dict[str, Dict]:
+    """
+    Simple function to get current stock prices
+    
+    Args:
+        stock_names: List of stock names (e.g., ['Reliance', 'TCS', 'HDFC Bank'])
+        wait_time: Time to wait for data collection (default: 5 seconds)
+    
+    Returns:
+        Dict with stock names as keys and price info as values
+        Example: {
+            'Reliance': {
+                'price': 2431.50,
+                'change': 12.30,
+                'high': 2445.00,
+                'low': 2420.00,
+                'open': 2425.00,
+                'volume': 1500,
+                'timestamp': datetime(2025, 10, 17, 10, 30, 45)
             }
-        return None
+        }
+    """
+    global _client
+    
+    try:
+        # Initialize client if needed
+        if _client is None:
+            _client = ICICIStockPriceClient()
+        
+        # Get prices
+        return _client.get_current_prices(stock_names, wait_time)
+        
+    except Exception as e:
+        print(f"Error fetching stock prices: {e}")
+        return {}
+
+def get_available_stocks() -> List[str]:
+    """
+    Get list of all available stock names
+    
+    Returns:
+        List of stock names that can be used with get_stock_prices()
+    """
+    global _client
+    
+    try:
+        if _client is None:
+            _client = ICICIStockPriceClient()
+        
+        return _client.get_available_stocks()
+        
+    except Exception as e:
+        print(f"Error getting stock list: {e}")
+        return []
+
+def cleanup():
+    """Clean up connections"""
+    global _client
+    if _client:
+        _client.disconnect()
+        _client = None
 
 # Usage
 if __name__ == "__main__":
@@ -254,13 +403,15 @@ if __name__ == "__main__":
     client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
     
     print("📊 Available Stocks:")
-    for name, code in client.stock_codes.items():
+    for name, code in list(client.stock_codes.items())[:10]:  # Show first 10
         print(f"   {name}: {code}")
+    if len(client.stock_codes) > 10:
+        print(f"   ... and {len(client.stock_codes) - 10} more stocks")
     
-    # Get selected stocks to stream
-    stock_codes = client.get_selected_stocks(["NCC", "VOLTAS", "PTC", "IDEA", "AARTIIND"])
+    # Get selected stocks to stream (limit to avoid overwhelming)
+    stock_codes = client.get_selected_stocks(max_stocks=200)  # Limit to 20 stocks for demo
     
-    print(f"\n� Starting live stream for {len(stock_codes)} stocks...")
+    print(f"\n🚀 Starting live stream for {len(stock_codes)} stocks...")
     print(f"⏱️  Throttling: Max 1 log per {client.log_interval} seconds per stock")
     print("Press Ctrl+C to stop\n")
     

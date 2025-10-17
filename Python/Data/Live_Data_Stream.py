@@ -288,36 +288,20 @@ class ICICIStockPriceClient:
             pass
     
     def get_selected_stocks(self, stock_list=None, max_stocks=200):
-        """
-        Get selected stock codes
-        
-        Args:
-            stock_list: List of stock names to include (None for all)
-            max_stocks: Maximum number of stocks to return (to avoid overwhelming)
-        
-        Returns:
-            List of WebSocket codes for selected stocks
-        """
+        """Get selected stock codes (kept for backward compatibility)"""
         if stock_list is None:
-            # Get all stocks but limit to avoid overwhelming the WebSocket
             all_codes = list(self.stock_codes.values())
-            selected_codes = all_codes[:max_stocks]
-            print(f"📊 Selected first {len(selected_codes)} stocks out of {len(all_codes)} available")
-            return selected_codes
+            return all_codes[:max_stocks]
         
-        # Get specific stocks from the list
         selected_codes = []
         for stock_name in stock_list:
             if stock_name in self.stock_codes:
                 selected_codes.append(self.stock_codes[stock_name])
             else:
-                # Try partial match
                 for name, code in self.stock_codes.items():
                     if stock_name.upper() in name.upper():
                         selected_codes.append(code)
                         break
-        
-        print(f"📊 Selected {len(selected_codes)} specific stocks")
         return selected_codes
     
     def get_available_stocks(self) -> List[str]:
@@ -400,32 +384,32 @@ if __name__ == "__main__":
         print("❌ Please set API_SESSION_TOKEN and APP_KEY in your .env file")
         exit(1)
 
-    client = ICICISimpleWebSocket(API_SESSION_TOKEN, APP_KEY)
+# Example usage
+if __name__ == "__main__":
+    # Example 1: Get prices for specific stocks
+    stocks = ['Reliance', 'TCS', 'HDFC Bank', 'Infosys']
+    prices = get_stock_prices(stocks, wait_time=3.0)
     
-    print("📊 Available Stocks:")
-    for name, code in list(client.stock_codes.items())[:10]:  # Show first 10
-        print(f"   {name}: {code}")
-    if len(client.stock_codes) > 10:
-        print(f"   ... and {len(client.stock_codes) - 10} more stocks")
+    print("📊 Current Stock Prices:")
+    print("=" * 50)
     
-    # Get selected stocks to stream (limit to avoid overwhelming)
-    stock_codes = client.get_selected_stocks(max_stocks=200)  # Limit to 20 stocks for demo
+    for stock, data in prices.items():
+        if data:
+            change_symbol = "📈" if data['change'] >= 0 else "📉"
+            print(f"{change_symbol} {stock:<20} | ₹{data['price']:>8,.2f} | Change: {data['change']:>+7.2f}")
+        else:
+            print(f"❌ {stock:<20} | No data available")
     
-    print(f"\n🚀 Starting live stream for {len(stock_codes)} stocks...")
-    print(f"⏱️  Throttling: Max 1 log per {client.log_interval} seconds per stock")
-    print("Press Ctrl+C to stop\n")
+    print("=" * 50)
     
-    try:
-        client.connect_and_stream(stock_codes, duration=300)  # Stream for 5 minutes
-    except KeyboardInterrupt:
-        print("\n🛑 Stream stopped by user")
-    finally:
-        # Show final statistics
-        stats = client.get_throttling_stats()
-        if stats:
-            print("\n📈 Final Statistics:")
-            print(f"   Total Updates Received: {stats['total_updates']}")
-            print(f"   Updates Logged: {stats['logged_updates']}")
-            print(f"   Updates Throttled: {stats['throttled_updates']}")
-            print(f"   Logging Efficiency: {stats['efficiency_percent']:.1f}%")
-            print(f"   Throttle Interval: {stats['log_interval_seconds']} seconds\n")
+    # Example 2: Show available stocks
+    print(f"\n📋 First 10 available stocks:")
+    available = get_available_stocks()
+    for i, stock in enumerate(available[:10]):
+        print(f"   {i+1:2d}. {stock}")
+    
+    if len(available) > 10:
+        print(f"   ... and {len(available) - 10} more stocks available")
+    
+    # Cleanup
+    cleanup()

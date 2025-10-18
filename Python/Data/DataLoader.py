@@ -127,12 +127,12 @@ def fetch_historical_data(stock_code, session_token):
     
     # Payload for historical data
     payload = json.dumps({
-        "interval": "30minute",
-        "from_date": "2025-10-01T09:20:00.000Z", 
-        "to_date": "2025-10-01T15:30:00.000Z",
+        "interval": "5minute",
+        "from_date": "2025-10-17T09:10:00.000Z", 
+        "to_date": "2025-10-17T09:30:00.000Z",
         "stock_code": stock_code,
         "exchange_code": "NSE",
-        "product_type": "futures"
+        "product_type": "cash"
     }, separators=(',', ':'))
     
     # Generate checksum
@@ -192,8 +192,8 @@ def fetch_historical_data(stock_code, session_token):
 
 # Load stock codes from CSV
 # You can modify these parameters:
-START_INDEX = 11      # Start from first stock (0-based)
-END_INDEX = 13       # End at 10th stock (set to None for all stocks)
+START_INDEX = 0      # Start from first stock (0-based)
+END_INDEX = None       # End at 10th stock (set to None for all stocks)
 
 stock_codes = load_stock_codes_from_csv(
     csv_file_path="stock_names_symbol.csv",

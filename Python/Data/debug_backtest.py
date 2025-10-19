@@ -47,16 +47,16 @@ def debug_backtest_data():
                     # Show first few entries with timestamps
                     print("   Sample entries:")
                     for i, entry in enumerate(stock_ohlc[:3]):
-                        timestamp = entry.get('timestamp', 'N/A')
+                        datetime_str = entry.get('datetime', 'N/A')
                         close_price = entry.get('close', 'N/A')
                         volume = entry.get('volume', 'N/A')
                         
-                        # Try to parse timestamp
+                        # Try to parse datetime
                         try:
-                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
                             time_str = dt.strftime('%H:%M:%S')
                         except:
-                            time_str = timestamp
+                            time_str = datetime_str
                         
                         # Calculate percentage if possible
                         if close_price != 'N/A':
@@ -68,9 +68,9 @@ def debug_backtest_data():
                     # Look specifically for 9:20 data
                     found_920 = False
                     for entry in stock_ohlc:
-                        timestamp = entry.get('timestamp', '')
+                        datetime_str = entry.get('datetime', '')
                         try:
-                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
                             if dt.hour == 9 and 18 <= dt.minute <= 22:
                                 close_price = entry.get('close')
                                 pct_change = ((close_price - previous_closes[symbol]) / previous_closes[symbol]) * 100
@@ -95,14 +95,14 @@ def debug_backtest_data():
         for symbol, data in stocks_data.items():
             if data:
                 for entry in data[:2]:  # Just check first 2 entries per stock
-                    timestamp = entry.get('timestamp', '')
-                    if timestamp:
-                        all_timestamps.append(timestamp)
+                    datetime_str = entry.get('datetime', '')
+                    if datetime_str:
+                        all_timestamps.append(datetime_str)
         
         print(f"Sample timestamps:")
         for i, ts in enumerate(all_timestamps[:10]):
             try:
-                dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
                 time_str = dt.strftime('%H:%M:%S')
                 print(f"   {i+1}. {ts} → {time_str}")
             except Exception as e:
@@ -122,12 +122,12 @@ def debug_backtest_data():
                     if close_price:
                         pct_change = ((close_price - prev_close) / prev_close) * 100
                         if abs(pct_change) >= 1.0:  # Lower threshold for debugging
-                            timestamp = entry.get('timestamp', 'N/A')
+                            datetime_str = entry.get('datetime', 'N/A')
                             try:
-                                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
                                 time_str = dt.strftime('%H:%M:%S')
                             except:
-                                time_str = timestamp
+                                time_str = datetime_str
                             
                             print(f"   📈 {symbol}: {pct_change:+.2f}% at {time_str} | ₹{prev_close} → ₹{close_price}")
                             movements_found += 1

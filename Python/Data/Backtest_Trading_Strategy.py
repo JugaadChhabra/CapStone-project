@@ -105,9 +105,9 @@ class TradingStrategyBacktest:
         
         for entry in stock_data:
             try:
-                # Parse the timestamp from the entry
-                timestamp_str = entry['timestamp']
-                entry_datetime = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                # Parse the datetime from the entry (format: "2025-10-17T09:20:00.000Z")
+                datetime_str = entry['datetime']
+                entry_datetime = datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
                 entry_time = entry_datetime.time()
                 
                 # Calculate time difference in minutes

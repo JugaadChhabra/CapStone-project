@@ -8,12 +8,10 @@ Implements the complete 3-step trading strategy:
 4. Filter by OI change >= 7%
 """
 
-import json
-import os
-import subprocess
+import json, os, subprocess, pandas as pd, helper_functions as hf
 from datetime import datetime, timedelta, time
 from typing import List, Dict, Optional
-import pandas as pd
+
 
 # Import our modules
 from automation.data_loader import get_all_previous_day_closes
@@ -38,24 +36,13 @@ class TradingStrategyOrchestrator:
         self.oi_data = {}
         self.final_candidates = []
         
-    def get_previous_day_close_date(self) -> str:
-        """Calculate the previous trading day date"""
-        today = datetime.now()
-        
-        # If today is Monday (0), go back 3 days to Friday
-        if today.weekday() == 0:  # Monday
-            target_date = today - timedelta(days=3)
-        else:
-            target_date = today - timedelta(days=1)
-            
-        return target_date.strftime("%Y-%m-%d")
     
     def step1_get_previous_day_closes(self) -> bool:
         """Step 1: Get previous day closing prices for all stocks"""
         print("\n🎯 STEP 1: Getting Previous Day Closing Prices")
         print("=" * 60)
         
-        target_date = self.get_previous_day_close_date()
+        target_date = hf.get_previous_day_close_date()
         print(f"📅 Target date: {target_date}")
         
         # Check if previous day closes file already exists for this date
@@ -287,7 +274,7 @@ class TradingStrategyOrchestrator:
             "execution_info": {
                 "timestamp": datetime.now().isoformat(),
                 "strategy_date": datetime.now().strftime("%Y-%m-%d"),
-                "previous_day_target": self.get_previous_day_close_date()
+                "previous_day_target": hf.get_previous_day_close_date()
             },
             "step_results": {
                 "step1_previous_closes": len(self.previous_day_closes),

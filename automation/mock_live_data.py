@@ -4,11 +4,9 @@ Mock Live Data Generator
 Simulates live market data for testing the trading strategy when WebSocket isn't receiving data
 """
 
-import random
-import json
+import random, json, pandas as pd
 from datetime import datetime
 from typing import Dict, List
-import pandas as pd
 
 def generate_mock_movements(stock_data: List[Dict], previous_day_closes: Dict = None) -> Dict:
     """

@@ -1,13 +1,7 @@
-import base64 
-import socketio
-import requests
-import json
+import base64, socketio, requests, json, os, threading, pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
-import os
 from time import sleep
-import pandas as pd
-import threading
 from typing import Dict, List
 
 # Global variables for connection state

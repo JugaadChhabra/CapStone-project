@@ -3,7 +3,7 @@
 
 # POSITION MANAGEMENT
 MAX_POSITIONS = 5           # Maximum number of concurrent trades
-POSITION_SIZE = 1000        # Position size in rupees per trade
+POSITION_SIZE = 100000        # Position size in rupees per trade
 MIN_QUANTITY = 1            # Minimum quantity per trade
 
 # RISK MANAGEMENT  
@@ -13,7 +13,8 @@ TARGET_PROFIT_PERCENT = 4.0 # Target profit percentage (4% default)
 # MARKET TIMING
 MARKET_OPEN_TIME = "09:15"  # Market open time (IST)
 MARKET_CLOSE_TIME = "15:30" # Market close time (IST)  
-STRATEGY_START_TIME = "09:20" # When to start looking for trades
+STRATEGY_START_TIME = "09:20" # When to find 2% movers
+MOMENTUM_CHECK_TIME = "09:25" # When to check momentum and OI
 
 # MONITORING
 POSITION_CHECK_INTERVAL = 10 # How often to check positions (seconds)
@@ -22,7 +23,7 @@ LOG_LEVEL = "INFO"          # Logging level: DEBUG, INFO, WARNING, ERROR
 # STRATEGY PARAMETERS
 MINIMUM_MOVE_PERCENT = 2.0  # Minimum percentage move to consider
 MOMENTUM_WAIT_TIME = 10.0   # Wait time for momentum check (seconds)
-OI_THRESHOLD_PERCENT = 7.0  # OI change threshold percentage
+OI_THRESHOLD_PERCENT = 7.0  # OI change threshold percentage (CRITICAL FILTER)
 
 # SAFETY FEATURES
 AUTO_CLOSE_AT_MARKET_CLOSE = True  # Close all positions at market close

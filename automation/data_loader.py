@@ -13,14 +13,27 @@ USAGE:
     previous_closes = get_all_previous_day_closes("2025-10-20")
 """
 
-import requests, json, helper_functions as hf
+import requests, json
 from typing import Dict
+from datetime import datetime, timedelta
 from icici_functions import (
     get_session_token, 
     load_stock_data_from_csv, 
     create_api_headers,
     HISTORICAL_URL
 )
+
+def get_previous_day_close_date():
+    """Calculate the previous trading day date"""
+    today = datetime.now()
+    
+    # If today is Monday (0), go back 3 days to Friday
+    if today.weekday() == 0:  # Monday
+        target_date = today - timedelta(days=3)
+    else:
+        target_date = today - timedelta(days=1)
+        
+    return target_date.strftime("%Y-%m-%d")
 
 def fetch_previous_day_close(stock_code: str, session_token: str, target_date: str) -> Dict:
     """
@@ -117,7 +130,7 @@ if __name__ == "__main__":
     """
     USE CASE: Testing - Test the get_all_previous_day_closes function    """
 
-    fetch_for = hf.get_previous_day_close_date()
+    fetch_for = get_previous_day_close_date()
 
     result = get_all_previous_day_closes(fetch_for)
     print(f"Retrieved {len(result)} stock prices")

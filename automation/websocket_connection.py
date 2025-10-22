@@ -30,27 +30,25 @@ from icici_functions import (
 )
 
 class WebSocketManager:
-    """Centralized WebSocket connection and data management"""
+    """Centralized WebSocket connection manager with reconnection support"""
     
-    def __init__(self, data_callback: Optional[Callable] = None):
-        """
-        Initialize WebSocket manager
+    def __init__(self):
+        self._sio = socketio.Client()
+        self._connected = False
+        self._subscribed_codes = []
+        self._stock_prices = {}  # Store current prices {websocket_code: price_data}
+        self._lock = threading.Lock()  # Thread safety for price updates
         
-        Args:
-            data_callback: Optional callback function for real-time data processing
-        """
-        # Connection state
-        self._sio = None
-        self._session_token = None
-        self._user_id = None
-        self._is_connected = False
+        # Reconnection settings
+        self._max_reconnect_attempts = 5
+        self._reconnect_delay = 30  # seconds
+        self._last_ping_time = datetime.now()
+        self._ping_interval = 30  # Send ping every 30 seconds
+        self._connection_timeout = 60  # Consider connection dead after 60 seconds
         
-        # Data storage
-        self._current_prices = {}
-        self._connection_lock = threading.Lock()
-        
-        # Callback for real-time data processing
-        self._data_callback = data_callback
+        # Auto-reconnection thread
+        self._reconnect_thread = None
+        self._should_maintain_connection = False
         
     def parse_stock_data(self, data) -> Optional[Dict]:
         """
@@ -229,18 +227,117 @@ class WebSocketManager:
             print("🧹 Price data cleared")
     
     def disconnect(self):
-        """Clean up WebSocket connection"""
+        """Disconnect WebSocket connection"""
         try:
-            if self._sio and self._sio.connected:
+            self._should_maintain_connection = False
+            
+            if self._reconnect_thread and self._reconnect_thread.is_alive():
+                self._reconnect_thread.join(timeout=5)
+            
+            if self._connected and self._sio.connected:
                 print("🔌 Disconnecting WebSocket...")
                 self._sio.disconnect()
-            
-            self._is_connected = False
-            self.clear_prices()
-            print("✅ WebSocket cleanup complete")
+                
+            self._connected = False
+            self._subscribed_codes.clear()
+            self._stock_prices.clear()
+            print("✅ WebSocket disconnected successfully")
             
         except Exception as e:
             print(f"⚠️  Disconnect error: {e}")
+    
+    def _start_connection_monitor(self):
+        """Start monitoring connection health and auto-reconnect if needed"""
+        import time
+        
+        def monitor_connection():
+            reconnect_attempts = 0
+            
+            while self._should_maintain_connection:
+                try:
+                    # Check if connection is still alive
+                    if not self._connected or not self._sio.connected:
+                        print("⚠️  WebSocket connection lost. Attempting reconnection...")
+                        
+                        if reconnect_attempts < self._max_reconnect_attempts:
+                            time.sleep(self._reconnect_delay)
+                            
+                            print(f"🔄 Reconnection attempt {reconnect_attempts + 1}/{self._max_reconnect_attempts}")
+                            
+                            if self._reconnect():
+                                print("✅ WebSocket reconnected successfully")
+                                reconnect_attempts = 0
+                            else:
+                                reconnect_attempts += 1
+                                print(f"❌ Reconnection failed. Attempt {reconnect_attempts}/{self._max_reconnect_attempts}")
+                        else:
+                            print(f"❌ Max reconnection attempts ({self._max_reconnect_attempts}) reached. Stopping monitor.")
+                            break
+                    
+                    # Send periodic ping to keep connection alive
+                    time_since_ping = (datetime.now() - self._last_ping_time).total_seconds()
+                    if time_since_ping >= self._ping_interval:
+                        self._send_ping()
+                        self._last_ping_time = datetime.now()
+                    
+                    time.sleep(10)  # Check every 10 seconds
+                    
+                except Exception as e:
+                    print(f"⚠️  Connection monitor error: {e}")
+                    time.sleep(30)
+        
+        self._reconnect_thread = threading.Thread(target=monitor_connection, daemon=True)
+        self._reconnect_thread.start()
+    
+    def _reconnect(self) -> bool:
+        """Attempt to reconnect WebSocket"""
+        try:
+            # Disconnect existing connection
+            if self._sio.connected:
+                self._sio.disconnect()
+            
+            # Create new socketio client
+            self._sio = socketio.Client()
+            self._setup_connection()
+            
+            # Reconnect
+            success = self.connect()
+            
+            if success and self._subscribed_codes:
+                # Re-subscribe to previous codes
+                print(f"🔄 Re-subscribing to {len(self._subscribed_codes)} codes...")
+                self.subscribe_to_codes(self._subscribed_codes)
+            
+            return success
+            
+        except Exception as e:
+            print(f"❌ Reconnection error: {e}")
+            return False
+    
+    def _send_ping(self):
+        """Send ping to keep connection alive"""
+        try:
+            if self._connected and self._sio.connected:
+                self._sio.emit('ping')
+        except Exception as e:
+            print(f"⚠️  Ping error: {e}")
+    
+    def start_persistent_connection(self):
+        """Start a persistent connection with auto-reconnection"""
+        self._should_maintain_connection = True
+        
+        if self.connect():
+            print("🔄 Starting connection monitor for persistent operation...")
+            self._start_connection_monitor()
+            return True
+        else:
+            print("❌ Failed to establish initial connection")
+            return False
+    
+    def get_current_prices(self) -> Dict:
+        """Get all current stock prices"""
+        with self._lock:
+            return self._stock_prices.copy()
     
     def is_connected(self) -> bool:
         """Check if WebSocket is connected"""

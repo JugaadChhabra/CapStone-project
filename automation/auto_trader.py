@@ -22,8 +22,9 @@ from dataclasses import dataclass, asdict
 # Import our optimized modules
 from icici_functions import get_env_config, create_api_headers
 from websocket_connection import WebSocketManager
-from Live_Data_Stream import run_trading_strategy, load_stock_data, cleanup
+from live_data_stream import run_trading_strategy, load_stock_data, cleanup
 from data_loader import get_all_previous_day_closes
+from order_management import OrderManager, OrderResponse
 
 # Import configuration
 try:
@@ -51,8 +52,10 @@ class Trade:
     direction: str  # 'LONG' or 'SHORT'
     stop_loss: float
     target: float
+    order_id: Optional[str] = None  # ICICI Direct order ID
     exit_price: Optional[float] = None
     exit_time: Optional[datetime] = None
+    exit_order_id: Optional[str] = None  # Exit order ID
     status: str = 'OPEN'  # 'OPEN', 'CLOSED', 'STOPPED'
     pnl: float = 0.0
 
@@ -73,16 +76,19 @@ class AutomatedTrader:
         market_open_str = config.MARKET_OPEN_TIME.split(":")
         market_close_str = config.MARKET_CLOSE_TIME.split(":")
         strategy_start_str = config.STRATEGY_START_TIME.split(":")
+        momentum_check_str = getattr(config, 'MOMENTUM_CHECK_TIME', '09:25').split(":")
         
         self.market_open = dt_time(int(market_open_str[0]), int(market_open_str[1]))
         self.market_close = dt_time(int(market_close_str[0]), int(market_close_str[1]))
-        self.strategy_time = dt_time(int(strategy_start_str[0]), int(strategy_start_str[1]))
+        self.strategy_time = dt_time(int(strategy_start_str[0]), int(strategy_start_str[1]))  # 9:20 AM
+        self.momentum_time = dt_time(int(momentum_check_str[0]), int(momentum_check_str[1]))  # 9:25 AM
         
         # State management
         self.trades: List[Trade] = []
         self.candidates = []
         self.previous_closes = {}
         self.ws_manager = None
+        self.order_manager = None  # Will be initialized when needed
         self.running = True
         
         # Setup signal handlers for graceful shutdown
@@ -125,35 +131,162 @@ class AutomatedTrader:
             self.logger.info(f"⏰ Market opens in {time_to_open}. Waiting...")
             time.sleep(60)  # Check every minute
     
-    def get_trading_candidates(self) -> List[str]:
-        """Execute trading strategy to get final candidates"""
-        self.logger.info("🎯 Executing trading strategy to find candidates...")
+    def get_2_percent_movers_at_920(self) -> List[str]:
+        """Step 1: Find 2% movers at 9:20 AM"""
+        self.logger.info("🎯 STEP 1: Finding 2% Movers at 9:20 AM")
+        self.logger.info("=" * 60)
         
         try:
-            # Step 1: Get previous day closes
+            # Get previous day closes
             self.logger.info("📊 Getting previous day closing prices...")
             self.previous_closes = get_all_previous_day_closes()
             self.logger.info(f"✅ Got {len(self.previous_closes)} previous closes")
             
-            # Step 2: Initialize stock data
+            # Initialize stock data
             self.logger.info("📈 Loading stock data for analysis...")
             stock_data, websocket_codes = load_stock_data()
             self.logger.info(f"✅ Loaded {len(stock_data)} stocks")
             
-            # Step 3: Run strategy to find movers
-            self.logger.info("🔍 Running strategy to find 2% movers...")
-            candidates = run_trading_strategy(wait_time=config.MOMENTUM_WAIT_TIME)
+            # Find 2% movers only
+            self.logger.info("🔍 Scanning for 2% movers...")
+            movers = run_trading_strategy(wait_time=config.MOMENTUM_WAIT_TIME)
             
-            if candidates:
-                self.logger.info(f"🎯 Found {len(candidates)} trading candidates: {candidates}")
-                return candidates[:self.max_positions]  # Limit to max positions
+            if movers:
+                self.logger.info(f"🎯 Found {len(movers)} stocks with 2%+ movement at 9:20 AM")
+                for i, symbol in enumerate(movers, 1):
+                    self.logger.info(f"   {i:2d}. � {symbol}")
+                return movers
             else:
-                self.logger.warning("⚠️ No trading candidates found")
+                self.logger.warning("⚠️ No 2% movers found at 9:20 AM")
                 return []
                 
         except Exception as e:
-            self.logger.error(f"❌ Error getting candidates: {e}")
+            self.logger.error(f"❌ Error finding 2% movers: {e}")
             return []
+    
+    def get_final_trading_candidates(self, movers_920: List[str]) -> List[str]:
+        """Step 2: Check momentum at 9:25 AM and filter by OI"""
+        self.logger.info("🎯 STEP 2: Checking Momentum & OI at 9:25 AM")
+        self.logger.info("=" * 60)
+        
+        if not movers_920:
+            self.logger.warning("⚠️ No 9:20 movers to check momentum for")
+            return []
+        
+        try:
+            # Check momentum for 9:20 movers
+            self.logger.info(f"⚡ Checking momentum for {len(movers_920)} stocks from 9:20...")
+            momentum_candidates = run_trading_strategy(wait_time=config.MOMENTUM_WAIT_TIME)
+            
+            if not momentum_candidates:
+                self.logger.warning("⚠️ No stocks maintained momentum from 9:20 to 9:25")
+                return []
+            
+            self.logger.info(f"✅ {len(momentum_candidates)} stocks maintained momentum")
+            for i, symbol in enumerate(momentum_candidates, 1):
+                self.logger.info(f"   {i:2d}. ⚡ {symbol}")
+            
+            # Filter by OI data
+            self.logger.info("🔍 Filtering by OI data (>= 7%)...")
+            final_candidates = self.filter_by_oi(momentum_candidates)
+            
+            if final_candidates:
+                self.logger.info(f"💎 FINAL TRADING CANDIDATES: {len(final_candidates)} stocks")
+                for i, candidate in enumerate(final_candidates, 1):
+                    symbol = candidate if isinstance(candidate, str) else candidate['symbol']
+                    self.logger.info(f"   {i:2d}. 💎 {symbol}")
+                return [c if isinstance(c, str) else c['symbol'] for c in final_candidates]
+            else:
+                self.logger.warning("⚠️ No candidates passed OI filter")
+                return []
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error checking momentum and OI: {e}")
+            return []
+
+    def get_trading_candidates(self) -> List[str]:
+        """Execute complete trading strategy with proper timing - DEPRECATED"""
+        # This method is kept for backward compatibility 
+        # The new run() method handles timing properly with separate 9:20 and 9:25 steps
+        self.logger.warning("⚠️ get_trading_candidates() is deprecated. Use timed strategy steps.")
+        return []
+    
+    def filter_by_oi(self, candidates: List[str]) -> List[str]:
+        """Filter candidates by OI change >= 7%"""
+        try:
+            import subprocess
+            import pandas as pd
+            
+            # Run OI scraping
+            self.logger.info("🕷️ Scraping OI data from NSE...")
+            result = subprocess.run(['python3', 'scraping.py'], 
+                                  capture_output=True, text=True, cwd='.')
+            
+            if result.returncode != 0:
+                self.logger.error(f"❌ OI scraping failed: {result.stderr}")
+                # Return original candidates if scraping fails
+                self.logger.warning("⚠️ Proceeding without OI filter")
+                return candidates
+            
+            self.logger.info("✅ OI scraping completed")
+            
+            # Load and process OI data
+            import os
+            if not os.path.exists("oi_spurts_nse_clean.csv"):
+                self.logger.error("❌ OI data file not found")
+                return candidates
+            
+            oi_df = pd.read_csv("oi_spurts_nse_clean.csv")
+            self.logger.info(f"📊 Loaded OI data for {len(oi_df)} stocks")
+            
+            # Filter candidates by OI >= 7%
+            qualified_stocks = []
+            oi_threshold = getattr(config, 'OI_THRESHOLD_PERCENT', 7.0)
+            
+            self.logger.info(f"🎯 Filtering {len(candidates)} candidates by OI >= {oi_threshold}%:")
+            self.logger.info("-" * 60)
+            
+            for symbol in candidates:
+                # Find OI data for this symbol
+                oi_row = oi_df[oi_df['Symbol'].str.upper() == symbol.upper()]
+                
+                if not oi_row.empty:
+                    try:
+                        # Try different possible column names for OI change
+                        oi_change = None
+                        possible_columns = ['OI_Change_Percent', 'OI Change %', 'OI Change', 'Change in OI %']
+                        
+                        for col in possible_columns:
+                            if col in oi_df.columns:
+                                oi_change = oi_row.iloc[0][col]
+                                break
+                        
+                        if oi_change is not None and pd.notna(oi_change):
+                            # Clean the value (remove % symbol if present)
+                            oi_change_clean = str(oi_change).replace('%', '').replace(',', '')
+                            oi_change_num = float(oi_change_clean)
+                            
+                            if oi_change_num >= oi_threshold:
+                                qualified_stocks.append(symbol)
+                                self.logger.info(f"   ✅ {symbol:8s}: OI +{oi_change_num:6.2f}%")
+                            else:
+                                self.logger.info(f"   ❌ {symbol:8s}: OI +{oi_change_num:6.2f}% (< {oi_threshold}%)")
+                        else:
+                            self.logger.info(f"   ⚠️  {symbol:8s}: Invalid OI data")
+                    except (ValueError, TypeError) as e:
+                        self.logger.info(f"   ⚠️  {symbol:8s}: Error parsing OI data - {e}")
+                else:
+                    self.logger.info(f"   ❌ {symbol:8s}: Not found in OI data")
+            
+            self.logger.info("-" * 60)
+            self.logger.info(f"💎 {len(qualified_stocks)} stocks qualified with OI >= {oi_threshold}%")
+            
+            return qualified_stocks
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error in OI filtering: {e}")
+            # Return original candidates if filtering fails
+            return candidates
     
     def calculate_trade_params(self, symbol: str, current_price: float) -> Dict:
         """Calculate trade parameters (quantity, stop loss, target)"""
@@ -173,34 +306,62 @@ class AutomatedTrader:
     
     def place_trade(self, symbol: str, current_price: float) -> Optional[Trade]:
         """
-        Place a trade (mock implementation - replace with actual order API)
-        
-        NOTE: This is a mock implementation. In production, you would:
-        1. Use ICICI Direct's order placement API
-        2. Handle order confirmation
-        3. Deal with partial fills, rejections, etc.
+        Place a real trade using ICICI Direct API
         """
         try:
+            # Initialize order manager if not done
+            if not self.order_manager:
+                self.order_manager = OrderManager()
+                self.logger.info("✅ Order manager initialized")
+            
             trade_params = self.calculate_trade_params(symbol, current_price)
             
-            # Mock order placement - replace with actual API call
-            self.logger.info(f"📤 MOCK ORDER: BUY {trade_params['quantity']} shares of {symbol} at ₹{current_price:.2f}")
+            # Determine order type and price
+            if trade_params['direction'] == 'LONG':
+                action = "buy"
+                # Use limit order slightly above current price for better fills
+                order_price = current_price * 1.001  # 0.1% above market
+            else:
+                action = "sell"
+                order_price = current_price * 0.999  # 0.1% below market
             
-            # Create trade record
-            trade = Trade(
+            # Place the order
+            self.logger.info(f"📤 Placing {action.upper()} order: {trade_params['quantity']} shares of {symbol} at ₹{order_price:.2f}")
+            
+            order_response = self.order_manager.place_equity_order(
                 symbol=symbol,
-                entry_price=current_price,
-                entry_time=datetime.now(),
+                action=action,
                 quantity=trade_params['quantity'],
-                direction=trade_params['direction'],
-                stop_loss=trade_params['stop_loss'],
-                target=trade_params['target']
+                price=order_price,
+                order_type="limit"
             )
             
-            self.trades.append(trade)
-            self.logger.info(f"✅ Trade placed: {symbol} | Entry: ₹{current_price:.2f} | SL: ₹{trade.stop_loss:.2f} | Target: ₹{trade.target:.2f}")
-            
-            return trade
+            if order_response.status == "placed" and order_response.order_id:
+                # Create trade record with real order ID
+                trade = Trade(
+                    symbol=symbol,
+                    entry_price=order_price,  # Use order price, not current price
+                    entry_time=datetime.now(),
+                    quantity=trade_params['quantity'],
+                    direction=trade_params['direction'],
+                    stop_loss=trade_params['stop_loss'],
+                    target=trade_params['target'],
+                    order_id=order_response.order_id
+                )
+                
+                self.trades.append(trade)
+                self.logger.info(f"✅ Order placed successfully!")
+                self.logger.info(f"   Order ID: {order_response.order_id}")
+                self.logger.info(f"   Symbol: {symbol}")
+                self.logger.info(f"   Price: ₹{order_price:.2f}")
+                self.logger.info(f"   Quantity: {trade_params['quantity']}")
+                self.logger.info(f"   Stop Loss: ₹{trade.stop_loss:.2f}")
+                self.logger.info(f"   Target: ₹{trade.target:.2f}")
+                
+                return trade
+            else:
+                self.logger.error(f"❌ Order placement failed: {order_response.message}")
+                return None
             
         except Exception as e:
             self.logger.error(f"❌ Error placing trade for {symbol}: {e}")
@@ -208,35 +369,58 @@ class AutomatedTrader:
     
     def close_trade(self, trade: Trade, exit_price: float, reason: str) -> bool:
         """
-        Close a trade (mock implementation)
-        
-        NOTE: Replace with actual order API in production
+        Close a trade using ICICI Direct API
         """
         try:
-            # Mock order closure - replace with actual API call
-            self.logger.info(f"📤 MOCK ORDER: SELL {trade.quantity} shares of {trade.symbol} at ₹{exit_price:.2f}")
+            if not self.order_manager:
+                self.logger.error("❌ Order manager not initialized")
+                return False
             
-            # Update trade record
-            trade.exit_price = exit_price
-            trade.exit_time = datetime.now()
-            trade.status = 'CLOSED' if reason != 'STOP_LOSS' else 'STOPPED'
+            # Determine exit action (opposite of entry)
+            exit_action = "sell" if trade.direction == "LONG" else "buy"
             
-            # Calculate P&L
-            if trade.direction == 'LONG':
-                trade.pnl = (exit_price - trade.entry_price) * trade.quantity
+            # Place exit order
+            self.logger.info(f"📤 Placing {exit_action.upper()} order to close position: {trade.quantity} shares of {trade.symbol} at ₹{exit_price:.2f}")
+            
+            exit_order_response = self.order_manager.place_equity_order(
+                symbol=trade.symbol,
+                action=exit_action,
+                quantity=trade.quantity,
+                price=exit_price,
+                order_type="limit"
+            )
+            
+            if exit_order_response.status == "placed" and exit_order_response.order_id:
+                # Update trade record
+                trade.exit_price = exit_price
+                trade.exit_time = datetime.now()
+                trade.exit_order_id = exit_order_response.order_id
+                trade.status = 'CLOSED' if reason != 'STOP_LOSS' else 'STOPPED'
+                
+                # Calculate P&L
+                if trade.direction == 'LONG':
+                    trade.pnl = (exit_price - trade.entry_price) * trade.quantity
+                else:
+                    trade.pnl = (trade.entry_price - exit_price) * trade.quantity
+                
+                self.logger.info(f"✅ Exit order placed successfully!")
+                self.logger.info(f"   Exit Order ID: {exit_order_response.order_id}")
+                self.logger.info(f"   Symbol: {trade.symbol}")
+                self.logger.info(f"   Exit Price: ₹{exit_price:.2f}")
+                self.logger.info(f"   P&L: ₹{trade.pnl:.2f}")
+                self.logger.info(f"   Reason: {reason}")
+                
+                return True
             else:
-                trade.pnl = (trade.entry_price - exit_price) * trade.quantity
-            
-            self.logger.info(f"✅ Trade closed: {trade.symbol} | Exit: ₹{exit_price:.2f} | P&L: ₹{trade.pnl:.2f} | Reason: {reason}")
-            
-            return True
+                self.logger.error(f"❌ Exit order placement failed: {exit_order_response.message}")
+                return False
             
         except Exception as e:
             self.logger.error(f"❌ Error closing trade for {trade.symbol}: {e}")
             return False
     
     def monitor_positions(self):
-        """Monitor open positions for stop loss/target hit"""
+        """Monitor open positions for stop loss/target hit and order status"""
         if not self.ws_manager:
             return
             
@@ -245,6 +429,25 @@ class AutomatedTrader:
         for trade in self.trades:
             if trade.status != 'OPEN':
                 continue
+            
+            # Check order status if we have an order ID
+            if trade.order_id and self.order_manager:
+                order_status = self.order_manager.get_order_status(trade.order_id)
+                if order_status:
+                    status = order_status.get('order_status', '').lower()
+                    if status in ['rejected', 'cancelled']:
+                        self.logger.warning(f"⚠️ Order {trade.order_id} for {trade.symbol} was {status}")
+                        trade.status = 'CANCELLED'
+                        continue
+                    elif status == 'complete':
+                        # Order filled - update entry price if different
+                        filled_price = float(order_status.get('average_price', trade.entry_price))
+                        if abs(filled_price - trade.entry_price) > 0.01:
+                            self.logger.info(f"📊 Order filled at ₹{filled_price:.2f} (vs expected ₹{trade.entry_price:.2f})")
+                            trade.entry_price = filled_price
+                            # Recalculate stop loss and target based on actual fill price
+                            trade.stop_loss = filled_price * (1 - self.stop_loss_pct / 100)
+                            trade.target = filled_price * (1 + self.target_profit_pct / 100)
                 
             # Find current price for this trade
             current_price = None
@@ -359,27 +562,48 @@ class AutomatedTrader:
             
             self.logger.info("🟢 Market is open. Starting trading operations...")
             
-            # Wait until strategy time (9:20 AM)
+            # PHASE 1: Wait until 9:20 AM and find 2% movers
             while datetime.now().time() < self.strategy_time:
-                self.logger.info(f"⏰ Waiting for strategy time ({self.strategy_time})")
+                self.logger.info(f"⏰ Waiting for 9:20 AM strategy time...")
                 time.sleep(30)
             
-            # Get trading candidates
-            self.candidates = self.get_trading_candidates()
+            # Step 1: Find 2% movers at 9:20 AM
+            movers_920 = self.get_2_percent_movers_at_920()
+            
+            if not movers_920:
+                self.logger.warning("⚠️ No 2% movers found at 9:20 AM. Exiting.")
+                return
+            
+            # PHASE 2: Wait until 9:25 AM for momentum check
+            self.logger.info(f"⏰ Waiting until 9:25 AM for momentum verification...")
+            while datetime.now().time() < self.momentum_time:
+                time_left = datetime.combine(datetime.today(), self.momentum_time) - \
+                           datetime.combine(datetime.today(), datetime.now().time())
+                self.logger.info(f"⏰ {time_left} until momentum check...")
+                time.sleep(30)
+            
+            # Step 2: Check momentum and filter by OI at 9:25 AM
+            self.candidates = self.get_final_trading_candidates(movers_920)
             
             if not self.candidates:
-                self.logger.warning("⚠️ No trading candidates found. Monitoring mode only.")
+                self.logger.warning("⚠️ No final trading candidates after momentum & OI filter.")
+                return
             
-            # Initialize WebSocket for live monitoring
+            # Initialize persistent WebSocket connection for long-term monitoring
             from websocket_connection import WebSocketManager
-            from Live_Data_Stream import _websocket_codes
+            from live_data_stream import _websocket_codes
             
+            self.logger.info("🔗 Establishing persistent WebSocket connection...")
             self.ws_manager = WebSocketManager()
-            self.ws_manager.connect()
+            
+            if not self.ws_manager.start_persistent_connection():
+                self.logger.error("❌ Failed to establish WebSocket connection")
+                return
             
             if _websocket_codes:
                 self.ws_manager.subscribe_to_codes(_websocket_codes)
                 time.sleep(5)  # Wait for subscription
+                self.logger.info(f"✅ Subscribed to {len(_websocket_codes)} stock codes for monitoring")
             
             # Place initial trades
             if self.candidates and self.ws_manager:

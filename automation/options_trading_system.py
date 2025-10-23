@@ -492,22 +492,57 @@ async def main():
         print("\n" + "=" * 70)
         print("🎯 OPTIONS TRADING SYSTEM READY")
         print("=" * 70)
-        print("System has completed screening. Use these commands:")
-        print()
-        print("📊 View Results:")
-        print("  trader.display_tradeable_stocks()")
-        print()
-        print("💰 Place Trades:")
-        print("  trader.buy_option('RELIANCE', 'CE')  # Buy call for positive mover")
-        print("  trader.buy_option('TCS', 'PE')       # Buy put for negative mover")
-        print()
-        print("📋 Available Stocks:")
+        
         if trader.tradeable_stocks:
+            print("System has completed screening successfully!")
+            print(f"Found {len(trader.tradeable_stocks)} tradeable stocks:")
+            print()
+            print("📊 View Results:")
+            print("  trader.display_tradeable_stocks()")
+            print()
+            print("💰 Place Trades:")
+            for stock in trader.tradeable_stocks:
+                option_type = "CE" if stock.direction == 'positive' else "PE"
+                direction_word = "call" if stock.direction == 'positive' else "put"
+                print(f"  trader.buy_option('{stock.symbol}', '{option_type}')  # Buy {direction_word} for {stock.direction} mover")
+            print()
+            print("📋 Available Stocks:")
             for stock in trader.tradeable_stocks:
                 option_type = "CE" if stock.direction == 'positive' else "PE"
                 print(f"  trader.buy_option('{stock.symbol}', '{option_type}')")
         else:
-            print("  (No tradeable stocks found)")
+            print("No tradeable stocks found in screening.")
+            print()
+            
+            # Check why no stocks were found
+            current_time = datetime.now().time()
+            market_open = datetime.now().replace(hour=9, minute=15).time()
+            market_close = datetime.now().replace(hour=15, minute=30).time()
+            
+            if not (market_open <= current_time <= market_close):
+                print("⚠️  REASON: Markets are currently CLOSED")
+                print(f"   Current time: {current_time.strftime('%H:%M:%S')}")
+                print(f"   Market hours: 09:15 AM - 03:30 PM IST")
+                print()
+                print("🕘 WHEN TO RUN:")
+                print("   - Run between 9:15 AM - 3:30 PM on trading days")
+                print("   - Optimal timing: 9:15 AM (system waits for 9:20 AM)")
+                print("   - Trading days: Monday to Friday (excluding holidays)")
+            else:
+                print("⚠️  REASON: No stocks met the 2%+ movement criteria")
+                print("   This can happen on low-volatility trading days")
+            
+            print()
+            print("📊 View Debug Info:")
+            print("  trader.display_tradeable_stocks()  # Shows empty list")
+            print()
+            print("🧪 Test Commands (for development):")
+            print("  # These use dummy data for testing:")
+            print("  trader.buy_option('RELIANCE', 'CE')  # Test call order")
+            print("  trader.buy_option('TCS', 'PE')       # Test put order")
+            print()
+            print("📋 No actual tradeable stocks available")
+        
         print("=" * 70)
         
         # Keep running for manual trades

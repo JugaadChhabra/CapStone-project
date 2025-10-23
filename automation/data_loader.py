@@ -96,6 +96,17 @@ def get_all_previous_day_closes(target_date: str) -> Dict[str, float]:
     """
     print("🔄 Fetching previous day closing prices for all stocks...")
     
+    # Check market timing
+    current_time = datetime.now().time()
+    market_open = datetime.now().replace(hour=9, minute=15).time()
+    market_close = datetime.now().replace(hour=15, minute=30).time()
+    is_market_hours = market_open <= current_time <= market_close
+    
+    if not is_market_hours:
+        print(f"⚠️  Market is currently CLOSED (Current: {current_time.strftime('%H:%M:%S')})")
+        print("   Market hours: 09:15 AM - 03:30 PM IST")
+        print("   Historical data APIs may not work outside market hours")
+    
     # Load stock codes and get session token using centralized utilities
     stock_codes = load_stock_data_from_csv('symbols_only')
     session_token = get_session_token()
@@ -111,17 +122,48 @@ def get_all_previous_day_closes(target_date: str) -> Dict[str, float]:
         return {}
     
     previous_closes = {}
+    failed_count = 0
     
-    for stock_code in stock_codes:
+    # Test with first stock to see if API is working
+    if stock_codes:
+        print(f"🧪 Testing API with first stock: {stock_codes[0]}")
+        test_result = fetch_previous_day_close(stock_codes[0], session_token, target_date)
+        
+        if "error" in test_result:
+            print(f"❌ API test failed: {test_result['error']}")
+            print("   Possible reasons:")
+            print("   - Market closed (historical APIs may be limited)")
+            print("   - Invalid date (market holiday)")
+            print("   - API rate limiting")
+            print("   - Session token expired")
+            return {}
+        else:
+            print(f"✅ API test successful: {test_result}")
+    
+    # Limit to first 10 stocks for faster testing during development
+    max_stocks = 10 if not is_market_hours else len(stock_codes)
+    print(f"📊 Fetching data for {max_stocks} stocks (limited for testing)")
+    
+    for i, stock_code in enumerate(stock_codes[:max_stocks]):
+        if i > 0 and i % 5 == 0:
+            print(f"   Progress: {i}/{max_stocks} stocks processed...")
+            
         prev_close_data = fetch_previous_day_close(stock_code, session_token, target_date)
         
         if prev_close_data and "error" not in prev_close_data:
             previous_closes[stock_code] = prev_close_data["previous_close"]
-        
+        else:
+            failed_count += 1
+            
         import time
-        time.sleep(0.1)  # Rate limiting
+        time.sleep(0.2)  # Slightly longer rate limiting
     
     print(f"📊 Successfully retrieved {len(previous_closes)} closing prices")
+    print(f"❌ Failed to get {failed_count} closing prices")
+    
+    if len(previous_closes) == 0:
+        print("⚠️  No closing prices retrieved - this is expected outside market hours")
+    
     return previous_closes
 
 

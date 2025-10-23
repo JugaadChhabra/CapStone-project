@@ -6,6 +6,13 @@ MAX_POSITIONS = 5           # Maximum number of concurrent trades
 POSITION_SIZE = 100000        # Position size in rupees per trade
 MIN_QUANTITY = 1            # Minimum quantity per trade
 
+# OPTIONS TRADING CONFIGURATION
+DEFAULT_UNDERLYING = "NIFTY"     # Default underlying for options
+OPTION_LOT_SIZE = 25            # NIFTY lot size (25 shares per lot)
+DAYS_TO_EXPIRY = 7              # Prefer options expiring in 7 days
+STRIKE_BUFFER = 100             # Strike price buffer from current price
+OPTION_TYPE_PREFERENCE = "call"  # Default option type: "call" or "put"
+
 # RISK MANAGEMENT  
 STOP_LOSS_PERCENT = 2.0     # Stop loss percentage (2% default)
 TARGET_PROFIT_PERCENT = 4.0 # Target profit percentage (4% default)

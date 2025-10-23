@@ -39,9 +39,16 @@ class WebSocketManager:
         self._stock_prices = {}  # Store current prices {websocket_code: price_data}
         self._lock = threading.Lock()  # Thread safety for price updates
         
+        # Connection variables
+        self._user_id = None
+        self._session_token = None
+        self._current_prices = {}  # Store current prices {websocket_code: price_data}
+        self._connection_lock = threading.Lock()  # Thread safety for price updates
+        self._data_callback = None  # Optional callback for data processing
+        
         # Reconnection settings
         self._max_reconnect_attempts = 5
-        self._reconnect_delay = 30  # seconds
+        self._reconnect_delay = 10  # Reduced to 10 seconds for trading window
         self._last_ping_time = datetime.now()
         self._ping_interval = 30  # Send ping every 30 seconds
         self._connection_timeout = 60  # Consider connection dead after 60 seconds
@@ -83,12 +90,12 @@ class WebSocketManager:
         @self._sio.event
         def connect():
             print("🔗 WebSocket connected successfully!")
-            self._is_connected = True
+            self._connected = True
         
         @self._sio.event
         def disconnect():
             print("🔌 WebSocket disconnected")
-            self._is_connected = False
+            self._connected = False
         
         @self._sio.on('stock')
         def on_stock_data(data):
@@ -134,7 +141,7 @@ class WebSocketManager:
         Returns:
             True if connection successful, False otherwise
         """
-        if self._is_connected:
+        if self._connected:
             print("✅ Already connected to WebSocket")
             return True
         
@@ -158,18 +165,20 @@ class WebSocketManager:
                 wait_timeout=10
             )
             
-            self._is_connected = self._sio.connected
+            self._connected = self._sio.connected
             
-            if self._is_connected:
+            if self._connected:
                 print("✅ WebSocket connection established")
+                # Store subscribed codes for reconnection
+                self._subscribed_codes = []
             else:
                 print("❌ WebSocket connection failed")
                 
-            return self._is_connected
+            return self._connected
             
         except Exception as e:
             print(f"❌ WebSocket connection error: {e}")
-            self._is_connected = False
+            self._connected = False
             return False
     
     def subscribe_to_codes(self, websocket_codes: List[str]) -> bool:
@@ -182,7 +191,7 @@ class WebSocketManager:
         Returns:
             True if subscription successful, False otherwise
         """
-        if not self._is_connected or not self._sio:
+        if not self._connected or not self._sio:
             print("❌ Not connected to WebSocket")
             return False
         
@@ -192,6 +201,9 @@ class WebSocketManager:
         try:
             for code in websocket_codes:
                 self._sio.emit('join', code)
+            
+            # Store subscribed codes for reconnection
+            self._subscribed_codes = websocket_codes.copy()
             
             print(f"✅ Subscription requests sent for {len(websocket_codes)} stocks")
             return True
@@ -298,7 +310,7 @@ class WebSocketManager:
             
             # Create new socketio client
             self._sio = socketio.Client()
-            self._setup_connection()
+            self._setup_event_handlers()
             
             # Reconnect
             success = self.connect()
@@ -334,14 +346,9 @@ class WebSocketManager:
             print("❌ Failed to establish initial connection")
             return False
     
-    def get_current_prices(self) -> Dict:
-        """Get all current stock prices"""
-        with self._lock:
-            return self._stock_prices.copy()
-    
     def is_connected(self) -> bool:
         """Check if WebSocket is connected"""
-        return self._is_connected
+        return self._connected
     
     def __enter__(self):
         """Context manager entry"""

@@ -204,95 +204,124 @@ def run_trading_strategy(wait_time: float = 5.0) -> List[str]:
     """
     global _stock_data, _websocket_codes, _movers_920, _ws_manager
     
-    try:
-        # Step 1: Load stock data if needed
-        if not _stock_data:
-            _stock_data, _websocket_codes = load_stock_data()
-            print(f"📊 Loaded {len(_stock_data)} stocks from CSV")
-        
-        # Step 2: Initialize WebSocket manager
-        _ws_manager = WebSocketManager()
-        
-        # Step 3: Connect to WebSocket
-        if not _ws_manager.connect():
-            raise Exception("Failed to connect to WebSocket")
-        
-        current_time = datetime.now().time()
-        print(f"⏰ Current time: {current_time.strftime('%H:%M:%S')}")
-        
-        # Determine strategy based on whether we have 9:20 data or not
-        if not _movers_920:
-            # No 9:20 data exists - this is the 9:20 AM run
-            print("🎯 Strategy: Finding 2% Movers (9:20 AM mode)")
-            print(f"📋 Fetching ALL {len(_websocket_codes)} stocks")
+    max_connection_retries = 3
+    
+    for connection_attempt in range(max_connection_retries):
+        try:
+            # Step 1: Load stock data if needed
+            if not _stock_data:
+                _stock_data, _websocket_codes = load_stock_data()
+                print(f"📊 Loaded {len(_stock_data)} stocks from CSV")
             
-            # Subscribe to all stocks
-            _ws_manager.subscribe_to_codes(_websocket_codes)
+            # Step 2: Initialize WebSocket manager
+            _ws_manager = WebSocketManager()
             
-            # Wait for data
-            print(f"⏳ Waiting {wait_time} seconds for data...")
-            sleep(wait_time)
+            # Step 3: Connect to WebSocket with retry logic
+            print(f"🔗 Connection attempt {connection_attempt + 1}/{max_connection_retries}")
+            if not _ws_manager.connect():
+                if connection_attempt < max_connection_retries - 1:
+                    print(f"⏰ Retrying connection in 10 seconds...")
+                    sleep(10)
+                    continue
+                else:
+                    raise Exception("Failed to connect to WebSocket after all attempts")
             
-            # Check how much data we received
-            price_count = _ws_manager.get_price_count()
-            print(f"📊 Received live data for {price_count} out of {len(_websocket_codes)} stocks")
+            current_time = datetime.now().time()
+            print(f"⏰ Current time: {current_time.strftime('%H:%M:%S')}")
             
-            if price_count == 0:
-                print("❌ No live data received! Check:")
-                print("   - Market timing (9:15 AM - 3:30 PM)")
-                print("   - Session token validity") 
-                print("   - Network connection")
-                print("\n🎲 Using mock data for testing...")
+            # Determine strategy based on whether we have 9:20 data or not
+            if not _movers_920:
+                # No 9:20 data exists - this is the 9:20 AM run
+                print("🎯 Strategy: Finding 2% Movers (9:20 AM mode)")
+                print(f"📋 Fetching ALL {len(_websocket_codes)} stocks")
                 
-                # Import and use mock data
-                try:
-                    from mock_live_data import inject_mock_data_into_live_stream
-                    mock_count = inject_mock_data_into_live_stream()
-                    print(f"✅ Generated {mock_count} mock data points")
-                except ImportError:
-                    print("❌ Mock data generator not available")
-                    return []
-                except Exception as e:
-                    print(f"❌ Error generating mock data: {e}")
-                    return []
+                # Subscribe to all stocks
+                if not _ws_manager.subscribe_to_codes(_websocket_codes):
+                    raise Exception("Failed to subscribe to stock codes")
+                
+                # Wait for data with extended time for first connection
+                extended_wait = wait_time + (connection_attempt * 2)  # Add extra time for retries
+                print(f"⏳ Waiting {extended_wait} seconds for data...")
+                sleep(extended_wait)
+                
+                # Check how much data we received
+                price_count = _ws_manager.get_price_count()
+                print(f"📊 Received live data for {price_count} out of {len(_websocket_codes)} stocks")
+                
+                if price_count == 0:
+                    print("❌ No live data received! Check:")
+                    print("   - Market timing (9:15 AM - 3:30 PM)")
+                    print("   - Session token validity") 
+                    print("   - Network connection")
+                    print("\n🎲 Using mock data for testing...")
+                    
+                    # Import and use mock data
+                    try:
+                        from mock_live_data import inject_mock_data_into_live_stream
+                        mock_count = inject_mock_data_into_live_stream()
+                        print(f"✅ Generated {mock_count} mock data points")
+                    except ImportError:
+                        print("❌ Mock data generator not available")
+                        if connection_attempt < max_connection_retries - 1:
+                            continue
+                        return []
+                    except Exception as e:
+                        print(f"❌ Error generating mock data: {e}")
+                        if connection_attempt < max_connection_retries - 1:
+                            continue
+                        return []
+                
+                # Find 2% movers and save their symbols
+                movers_symbols = find_2_percent_movers()
+                print(f"✅ Saved {len(movers_symbols)} stocks with 2%+ movement")
+                return movers_symbols
+                
+            else:
+                # 9:20 data exists - this is the 9:25 AM run  
+                print("🎯 Strategy: Checking Momentum (9:25 AM mode)")
+                print(f"📋 Found {len(_movers_920)} stocks from 9:20 AM run")
+                
+                # Get WebSocket codes for 9:20 movers
+                mover_tokens = [mover['token'] for mover in _movers_920]
+                mover_codes = get_websocket_codes_for_tokens(mover_tokens, _stock_data)
+                
+                print(f"📋 Checking momentum for {len(mover_codes)} stocks")
+                
+                # Subscribe to mover stocks only
+                if not _ws_manager.subscribe_to_codes(mover_codes):
+                    raise Exception("Failed to subscribe to mover stock codes")
+                
+                # Wait for data
+                print(f"⏳ Waiting {wait_time} seconds for data...")
+                sleep(wait_time)
+                
+                # Check which ones maintained momentum
+                final_symbols = check_momentum_maintained()
+                print(f"🎯 Final result: {len(final_symbols)} stocks ready for trading")
+                return final_symbols
             
-            # Find 2% movers and save their symbols
-            movers_symbols = find_2_percent_movers()
-            print(f"✅ Saved {len(movers_symbols)} stocks with 2%+ movement")
-            return movers_symbols
+            # If we reach here, the connection was successful
+            break
             
-        else:
-            # 9:20 data exists - this is the 9:25 AM run  
-            print("🎯 Strategy: Checking Momentum (9:25 AM mode)")
-            print(f"📋 Found {len(_movers_920)} stocks from 9:20 AM run")
+        except Exception as e:
+            print(f"❌ Error in run_trading_strategy (attempt {connection_attempt + 1}): {e}")
             
-            # Get WebSocket codes for 9:20 movers
-            mover_tokens = [mover['token'] for mover in _movers_920]
-            mover_codes = get_websocket_codes_for_tokens(mover_tokens, _stock_data)
+            # Clean up before retry
+            if _ws_manager:
+                _ws_manager.disconnect()
             
-            print(f"📋 Checking momentum for {len(mover_codes)} stocks")
-            
-            # Subscribe to mover stocks only
-            _ws_manager.subscribe_to_codes(mover_codes)
-            
-            # Wait for data
-            print(f"⏳ Waiting {wait_time} seconds for data...")
-            sleep(wait_time)
-            
-            # Check which ones maintained momentum
-            final_symbols = check_momentum_maintained()
-            print(f"🎯 Final result: {len(final_symbols)} stocks ready for trading")
-            return final_symbols
-        
-    except Exception as e:
-        print(f"❌ Error in run_trading_strategy: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
-    finally:
-        # Clean up WebSocket connection
-        if _ws_manager:
-            _ws_manager.disconnect()
+            if connection_attempt < max_connection_retries - 1:
+                print(f"🔄 Retrying strategy execution in 15 seconds...")
+                sleep(15)
+            else:
+                print("❌ All strategy execution attempts failed")
+                import traceback
+                traceback.print_exc()
+                return []
+        finally:
+            # Clean up WebSocket connection
+            if _ws_manager:
+                _ws_manager.disconnect()
 
 def cleanup():
     """Clean up WebSocket connection"""

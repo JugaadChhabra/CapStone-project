@@ -1,6 +1,15 @@
 # Trading Bot Configuration
 # Edit these settings to customize your trading strategy
 
+# MARKET TIMING
+MARKET_OPEN_TIME = "09:15"  # Market open time (IST)
+MARKET_CLOSE_TIME = "15:30" # Market close time (IST)  
+STRATEGY_START_TIME = "09:20" # When to find 2% movers
+MOMENTUM_CHECK_TIME = "09:25" # When to check momentum and OI
+
+# Trading Bot Configuration
+# Edit these settings to customize your trading strategy
+
 # POSITION MANAGEMENT
 MAX_POSITIONS = 5           # Maximum number of concurrent trades
 POSITION_SIZE = 100000        # Position size in rupees per trade
@@ -24,7 +33,7 @@ STRATEGY_START_TIME = "09:20" # When to find 2% movers
 MOMENTUM_CHECK_TIME = "09:25" # When to check momentum and OI
 
 # MONITORING
-POSITION_CHECK_INTERVAL = 10 # How often to check positions (seconds)
+POSITION_CHECK_INTERVAL = 300 # How often to check positions (seconds)
 LOG_LEVEL = "INFO"          # Logging level: DEBUG, INFO, WARNING, ERROR
 
 # STRATEGY PARAMETERS
@@ -46,3 +55,4 @@ ORDER_RETRY_DELAY = 30             # Delay between retries (seconds)
 SEND_SMS_ALERTS = False            # Send SMS for important events
 SEND_EMAIL_SUMMARY = False         # Send email with daily summary
 TELEGRAM_NOTIFICATIONS = False     # Send Telegram notifications
+ORDER_RETRY_DELAY = 30             # Delay between retries (seconds)

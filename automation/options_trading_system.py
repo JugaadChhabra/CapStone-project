@@ -154,6 +154,39 @@ class OptionsTrader:
             }
             self.logger.warning("⚠️ System is using EMERGENCY DUMMY DATA!")
             return True
+        def get_previous_day_closes(self) -> bool:
+            """
+            Get previous day closing prices for all stocks by reading the JSON file directly.
+            """
+            try:
+                self.logger.info("📊 Fetching previous day closing prices from JSON file...")
+                # Get target date for previous trading day
+                target_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+                # Try to find the correct file (previous_closes_<date>.json)
+                import os
+                closes_file = f"previous_closes_{target_date}.json"
+                closes_path = os.path.join(os.path.dirname(__file__), closes_file)
+                if not os.path.exists(closes_path):
+                    # Try to find the most recent previous_closes_*.json file
+                    files = [f for f in os.listdir(os.path.dirname(__file__)) if f.startswith('previous_closes_') and f.endswith('.json')]
+                    if files:
+                        files.sort(reverse=True)
+                        closes_path = os.path.join(os.path.dirname(__file__), files[0])
+                        self.logger.warning(f"⚠️ Target file not found, using most recent: {files[0]}")
+                    else:
+                        self.logger.error("❌ No previous_closes_*.json file found!")
+                        return False
+                with open(closes_path, 'r') as f:
+                    self.previous_closes = json.load(f)
+                if self.previous_closes and len(self.previous_closes) > 0:
+                    self.logger.info(f"✅ Retrieved {len(self.previous_closes)} closing prices from {os.path.basename(closes_path)}")
+                    return True
+                else:
+                    self.logger.warning("⚠️ No previous day closing prices found in file!")
+                    return False
+            except Exception as e:
+                self.logger.error(f"❌ Error getting previous day closes from file: {e}")
+                return False
 
     def run_screening_920(self) -> List[str]:
         """

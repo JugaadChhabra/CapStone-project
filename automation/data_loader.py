@@ -176,3 +176,10 @@ if __name__ == "__main__":
 
     result = get_all_previous_day_closes(fetch_for)
     print(f"Retrieved {len(result)} stock prices")
+
+    # Save results as JSON: {symbol: closing_price}
+    import json
+    output_path = f"previous_closes_{fetch_for}.json"
+    with open(output_path, "w") as f:
+        json.dump(result, f, indent=2)
+    print(f"Saved closing prices to {output_path}")

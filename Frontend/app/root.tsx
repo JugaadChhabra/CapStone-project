@@ -1,4 +1,5 @@
 import Header from "./components/custom/Header";
+import { AuthProvider } from "./contexts/AuthContext";
 import {
   isRouteErrorResponse,
   Links,
@@ -48,7 +49,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  return (
+    <AuthProvider>
+      <Outlet />
+    </AuthProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

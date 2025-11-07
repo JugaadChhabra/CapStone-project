@@ -1,9 +1,10 @@
 import React from "react";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 import FloatingNavbar from "../components/layout/FloatingNavbar";
 
 const SettingsPage: React.FC = () => {
   return (
-    <>
+    <ProtectedRoute>
       <FloatingNavbar activeTab="Settings" />
       <div style={{ 
         minHeight: "100vh", 
@@ -94,7 +95,7 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </>
+    </ProtectedRoute>
   );
 };
 

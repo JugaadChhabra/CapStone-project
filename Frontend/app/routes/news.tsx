@@ -1,9 +1,10 @@
 import React from "react";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 import FloatingNavbar from "../components/layout/FloatingNavbar";
 
 const NewsPage: React.FC = () => {
   return (
-    <>
+    <ProtectedRoute>
       <FloatingNavbar activeTab="News" />
       <div style={{ 
         minHeight: "100vh", 
@@ -49,7 +50,7 @@ const NewsPage: React.FC = () => {
           </p>
         </div>
       </div>
-    </>
+    </ProtectedRoute>
   );
 };
 

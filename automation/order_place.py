@@ -3,10 +3,12 @@ import json
 import hashlib
 from datetime import datetime, timezone
 
+load.dotenv()
+
 customerDetail_url = "https://api.icicidirect.com/breezeapi/api/v1/customerdetails"
-secret_key = "Your Secret_key goes here"
-appkey = "Your App_Key goes here"
-session_key = "Your Session_key goes here"
+secret_key = os.getenv('ICICI_SECRET_KEY')
+appkey = os.getenv('ICICI_APP_KEY')
+session_key = os.getenv('ICICI_SESSION_KEY')
 time_stamp = datetime.now(timezone.utc).isoformat()[:19] + '.000Z'
 
 customerDetail_payload = json.dumps({

@@ -1,4 +1,5 @@
 import React from "react";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 import PortfolioCard from "../components/dashboard/PortfolioCard";
 import StrategyOverview from "../components/dashboard/StrategyOverview";
 import FloatingNavbar from "../components/layout/FloatingNavbar";
@@ -67,7 +68,7 @@ const DashboardPage: React.FC = () => {
   ];
 
   return (
-    <>
+    <ProtectedRoute>
       <FloatingNavbar activeTab="Dashboard" />
       <div style={{ 
         minHeight: "100vh", 
@@ -96,7 +97,7 @@ const DashboardPage: React.FC = () => {
           />
         </div>
       </div>
-    </>
+    </ProtectedRoute>
   );
 };
 

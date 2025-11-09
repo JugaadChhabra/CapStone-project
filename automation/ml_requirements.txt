@@ -1,0 +1,18 @@
+# Core ML Trading System Dependencies
+pandas>=1.3.0
+numpy>=1.20.0
+scikit-learn>=1.0.0
+
+# Optional but recommended for advanced features
+xgboost>=1.5.0
+tensorflow>=2.8.0
+
+# Existing project dependencies
+python-dotenv
+requests
+selenium
+websocket-client
+
+# For data visualization (optional)
+matplotlib>=3.5.0
+seaborn>=0.11.0

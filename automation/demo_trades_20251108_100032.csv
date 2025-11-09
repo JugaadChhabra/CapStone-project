@@ -1,0 +1,3 @@
+trade_id,symbol,action,quantity,price,value,timestamp,signal,pnl
+1,IIFWEA,BUY,5,908.1,4540.5,2025-04-03 09:45:00,ML_BUY,
+2,IIFWEA,SELL,5,917.45,4587.25,2025-04-03 10:25:00,ML_SELL,46.750000000000114
